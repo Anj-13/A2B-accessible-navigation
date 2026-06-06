@@ -1,0 +1,12 @@
+[
+    {
+        "timestamp": "2026-06-06T14:20:07.393031+00:00",
+        "user_message": "Hello, I need directions to the nearest accessible station.",
+        "assistant_response": "(placeholder assistant) I received: Hello, I need directions to the nearest accessible station."
+    },
+    {
+        "timestamp": "2026-06-06T14:20:44.175753+00:00",
+        "user_message": "Hello, I need directions to the nearest accessible station.",
+        "assistant_response": "(placeholder assistant) I received: Hello, I need directions to the nearest accessible station."
+    }
+]

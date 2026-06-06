@@ -1,0 +1,15 @@
+{
+  "name": "nvidia-hack-for-impact-route-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Accessibility-aware London route recommendation engine",
+  "main": "scoreRoute.js",
+  "scripts": {
+    "demo": "node runDemo.js",
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
