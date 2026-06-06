@@ -63,10 +63,17 @@ function scorePreparedRoute(route, userProfile) {
 
   if (userProfile.accessibilityRequired) {
     if (!route.stepFree) score += 100;
-    if (!route.liftAvailable) score += 80;
-    if (route.liftStatus === "out_of_service") score += 120;
-    if (route.liftStatus === "unknown") score += 25;
-    if (!route.rampAvailable) score += 40;
+
+    if (["tube", "train", "mixed"].includes(route.mode)) {
+      if (!route.liftAvailable) score += 80;
+      if (route.liftStatus === "out_of_service") score += 120;
+      if (route.liftStatus === "unknown") score += 25;
+      if (!route.rampAvailable) score += 40;
+    }
+
+    if (route.mode === "bus" && !route.rampAvailable) {
+      score += 40;
+    }
 
     score += route.walkingMinutes * 1.5;
     score += route.transfers * 4;

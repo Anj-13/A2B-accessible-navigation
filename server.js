@@ -4,6 +4,7 @@ const http = require("node:http");
 const { URL } = require("node:url");
 
 const { demoScenarios } = require("./demoScenarios");
+const { buildRecommendationInput } = require("./dataIntegration");
 const { recommendRoute } = require("./scoreRoute");
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -83,6 +84,25 @@ async function requestHandler(request, response) {
 
   if (request.method === "GET" && url.pathname === "/api/demo-scenarios") {
     sendJson(response, 200, demoScenarios);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/recommend-from-data") {
+    try {
+      const body = await readJsonBody(request);
+      const input = buildRecommendationInput({
+        userProfile: body.userProfile ?? body.user_profile ?? {},
+        currentRouteId: body.currentRouteId ?? body.current_route_id,
+        journeyTime: body.journeyTime ?? body.journey_time,
+        rerouteThreshold: body.rerouteThreshold ?? body.reroute_threshold,
+      });
+      sendJson(response, 200, recommendRoute(input));
+    } catch (error) {
+      sendJson(response, error.statusCode ?? 400, {
+        error: error.message,
+        details: error.details ?? [],
+      });
+    }
     return;
   }
 

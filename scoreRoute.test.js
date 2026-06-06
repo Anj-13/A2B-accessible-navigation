@@ -169,6 +169,29 @@ test("user mode preferences influence route ranking", () => {
   assert.equal(ranked[0].route.id, "cycle");
 });
 
+test("street-level accessible modes do not require station lifts", () => {
+  const baseRoute = demoScenarios.fastest.currentRoute;
+  const cycleRoute = {
+    ...baseRoute,
+    id: "accessible_cycle",
+    mode: "cycle",
+    stepFree: true,
+    liftAvailable: false,
+    liftStatus: "unknown",
+    rampAvailable: false,
+    usesTrain: false,
+  };
+  const normalScore = scoreRoute(cycleRoute);
+  const accessibleScore = scoreRoute(cycleRoute, {
+    accessibilityRequired: true,
+  });
+
+  assert.equal(
+    accessibleScore - normalScore,
+    cycleRoute.walkingMinutes * 1.5 + cycleRoute.transfers * 4,
+  );
+});
+
 test("snake_case data is accepted for teammate integration", () => {
   const result = recommendRoute({
     user_profile: { accessibility_required: true },

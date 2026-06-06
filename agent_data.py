@@ -11,8 +11,9 @@ import json
 from pathlib import Path
 
 # When running inside the OpenClaw sandbox, set this to the path where the data
-# files are mounted/copied in the agent workspace. Locally it defaults to ./data.
-DATA_DIR = Path(__file__).parent / "data"
+# files are mounted/copied in the agent workspace. Locally the files live beside
+# this module.
+DATA_DIR = Path(__file__).parent
 
 
 def _load(name: str) -> dict:

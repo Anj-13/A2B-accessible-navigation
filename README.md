@@ -48,8 +48,22 @@ HOST=0.0.0.0 npm start
 
 ```text
 POST /api/recommend-route
+POST /api/recommend-from-data
 GET  /api/demo-scenarios
 GET  /health
+```
+
+`POST /api/recommend-from-data` reads the merged `route_data.json`,
+`traffic_events.json`, and `accessibility_data.json` files, applies active
+events, and runs the route engine. Its minimal request is:
+
+```json
+{
+  "userProfile": {
+    "accessibilityRequired": false
+  },
+  "currentRouteId": "route_1"
+}
 ```
 
 Example request:

@@ -8,7 +8,7 @@ import math
 import os
 import sys
 
-ROUTE_MODES = {"walk", "bus", "tube", "train", "mixed"}
+ROUTE_MODES = {"walk", "cycle", "car", "bus", "tube", "train", "mixed"}
 LIFT_STATUSES = {"working", "out_of_service", "unknown"}
 CROWDING_LEVELS = {"low", "medium", "high"}
 
@@ -21,7 +21,10 @@ FIELD_ALIASES = {
     "lift_status": "liftStatus",
     "ramp_available": "rampAvailable",
     "disruption_minutes": "disruptionMinutes",
-    "traffic_delay_minutes": "disruptionMinutes",
+    "traffic_delay_minutes": "trafficDelayMinutes",
+    "is_closed": "isClosed",
+    "road_closed": "isClosed",
+    "closure_reason": "closureReason",
     "crowding_level": "crowdingLevel",
     "uses_train": "usesTrain",
     "base_fare": "baseFare",
@@ -50,10 +53,13 @@ REQUIRED_ROUTE_FIELDS = [
 
 _NON_NEGATIVE_NUMBERS = [
     "etaMinutes", "walkingMinutes", "transfers", "disruptionMinutes",
-    "baseFare", "peakFare", "offPeakFare", "estimatedCost",
+    "trafficDelayMinutes", "baseFare", "peakFare", "offPeakFare", "estimatedCost",
 ]
 
-_BOOLEANS = ["stepFree", "liftAvailable", "rampAvailable", "usesTrain", "isPeakTime"]
+_BOOLEANS = [
+    "stepFree", "liftAvailable", "rampAvailable", "usesTrain", "isPeakTime",
+    "isClosed",
+]
 
 
 def _apply_aliases(route: dict) -> dict:
@@ -69,6 +75,9 @@ def normalize_route(route: dict) -> dict:
     n.setdefault("summary", n.get("id"))
     n.setdefault("mode", "train" if n.get("usesTrain") else "mixed")
     n.setdefault("disruptionMinutes", 0)
+    n.setdefault("trafficDelayMinutes", 0)
+    n.setdefault("isClosed", False)
+    n.setdefault("closureReason", None)
     n.setdefault("crowdingLevel", "low")
     n.setdefault("liftStatus", "unknown")
     n.setdefault("estimatedCost", n.get("offPeakFare", n.get("baseFare")))
