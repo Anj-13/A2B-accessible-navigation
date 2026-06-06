@@ -8,7 +8,13 @@ import logging
 
 from . import config
 from .llm import FALLBACK_RESPONSE, generate_response
-from .memory import complete_conversation_turn, ensure_history_file, start_conversation_turn
+from .memory import (
+    complete_conversation_turn,
+    ensure_history_file,
+    get_recent_conversation_turns,
+    start_conversation_turn,
+)
+from .route_client import format_route_context, get_route_recommendation
 from .tts import synthesize
 
 
@@ -26,12 +32,31 @@ def main() -> None:
         print("No input provided. Exiting.")
         return
 
-    # Save the user message before the model call so the turn is recorded immediately.
+    conversation_context = get_recent_conversation_turns()
+
+    # Save the user message before external calls so the turn is recorded immediately.
     turn_index = start_conversation_turn(user_message)
     print("Saved user message to conversation_history.json")
 
-    # Send to Ollama and keep the demo alive even if the local server is unavailable.
-    assistant_response = generate_response(user_message)
+    recommendation = get_route_recommendation(
+        user_message,
+        conversation_context=conversation_context,
+    )
+    route_context = format_route_context(recommendation)
+    if recommendation:
+        print(
+            "Route engine selected:",
+            recommendation.get("recommendedRoute", {}).get("id"),
+        )
+    else:
+        logger.warning("Continuing without route-engine context.")
+
+    # Send the scored route result to Ollama and keep the demo alive if unavailable.
+    assistant_response = generate_response(
+        user_message,
+        conversation_context=conversation_context,
+        route_context=route_context,
+    )
     if assistant_response == FALLBACK_RESPONSE:
         logger.warning("Using fallback assistant response because Ollama was unavailable.")
 

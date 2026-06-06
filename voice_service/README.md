@@ -37,6 +37,7 @@ copy .env.example .env
 - `OLLAMA_BASE_URL` defaults to `http://localhost:11434`
 - `OLLAMA_MODEL` defaults to `gpt-oss:120b`
 - `OLLAMA_TIMEOUT_SECONDS` defaults to `30`
+- `ROUTE_API_BASE_URL` defaults to `http://127.0.0.1:3000`
 
 Usage
 
@@ -48,7 +49,9 @@ python -m app.main
 ```
 
 This will prompt for a user message, save the conversation to `conversation_history.json`, and synthesize `output.mp3`.
-The demo will send the user message to a local Ollama server first and fall back gracefully if the server is unavailable.
+The demo calls the route recommendation API first, injects the scored route into
+the local Ollama prompt, then synthesizes the response. It falls back gracefully
+if either local service is unavailable.
 
 Test the Ollama integration with a local server running:
 
@@ -72,4 +75,7 @@ Notes
 
 Integration
 
-- The `app/main.py` demo is intentionally small so a planner agent can call into `app.memory` and `app.tts` later.
+- Start the route API from the repository root with `npm start`.
+- Run the voice service from `voice_service` with `python -m app.main`.
+- `app/route_client.py` calls `POST /api/recommend-from-data` and converts the
+  route result into authoritative context for Ollama.

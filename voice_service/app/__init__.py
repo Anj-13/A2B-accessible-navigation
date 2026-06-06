@@ -6,5 +6,6 @@ __all__ = [
     "memory",
     "tts",
     "stt",
+    "route_client",
     "main",
 ]

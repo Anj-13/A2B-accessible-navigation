@@ -31,6 +31,7 @@ def build_messages(
     user_message: str,
     conversation_context: Optional[List[Dict[str, str]]] = None,
     max_context_turns: int = MAX_CONTEXT_TURNS,
+    route_context: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     """Build the Ollama chat payload from bounded memory plus the live user message.
 
@@ -40,6 +41,18 @@ def build_messages(
     """
     recent_turns = conversation_context if conversation_context is not None else get_recent_conversation_turns(limit=max_context_turns)
     messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    if route_context:
+        messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "Authoritative route-engine result follows. Use these facts "
+                    "for the answer, do not invent a different route, and explain "
+                    f"rerouting clearly: {route_context}"
+                ),
+            }
+        )
 
     for turn in recent_turns[-max_context_turns:]:
         user_text = str(turn.get("user_message", "")).strip()
@@ -54,7 +67,11 @@ def build_messages(
     return messages
 
 
-def generate_response(user_message: str, conversation_context: Optional[List[Dict[str, str]]] = None) -> str:
+def generate_response(
+    user_message: str,
+    conversation_context: Optional[List[Dict[str, str]]] = None,
+    route_context: Optional[str] = None,
+) -> str:
     """Send the latest user message to Ollama and return the assistant response.
 
     The `conversation_context` argument can be supplied by tests or future
@@ -64,7 +81,11 @@ def generate_response(user_message: str, conversation_context: Optional[List[Dic
     payload = {
         "model": OLLAMA_MODEL,
         "stream": False,
-        "messages": build_messages(user_message, conversation_context=conversation_context),
+        "messages": build_messages(
+            user_message,
+            conversation_context=conversation_context,
+            route_context=route_context,
+        ),
     }
 
     try:
