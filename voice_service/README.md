@@ -38,6 +38,9 @@ cp voice_service/.env.example voice_service/.env
 - `OLLAMA_MODEL` defaults to `gpt-oss:120b`
 - `OLLAMA_TIMEOUT_SECONDS` defaults to `30`
 - `ROUTE_API_BASE_URL` defaults to `http://127.0.0.1:3000`
+- `ELEVENLABS_VOICE_ID` defaults to the documented example voice. Using a
+  direct ID allows restricted API keys to synthesize speech without requiring
+  the `voices_read` permission.
 
 ## Usage
 
