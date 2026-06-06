@@ -1,0 +1,58 @@
+{
+  "description": "Simulated disruption events for the demo. Each event links to the route legs it affects via affected_leg_ids, so the agent can reason about impact and reroute. Times are demo-day timestamps; adjust 'active' or 'starts_at' to control when an event fires during the live demo.",
+  "generated_at": "2026-06-06T08:45:00+01:00",
+  "events": [
+    {
+      "event_id": "evt_1",
+      "type": "line_delay",
+      "severity": "severe",
+      "mode": "transit",
+      "line": "Central",
+      "headline": "Severe delays on the Central line",
+      "detail": "Signal failure between Liverpool Street and Bond Street. Expect delays of around 15 minutes.",
+      "affected_leg_ids": ["leg_1_2"],
+      "affected_route_ids": ["route_1"],
+      "delay_min": 15,
+      "active": true,
+      "starts_at": "2026-06-06T08:50:00+01:00",
+      "expected_clear_at": "2026-06-06T10:00:00+01:00",
+      "advice": "Consider alternative routes avoiding the Central line between Liverpool Street and Bond Street."
+    },
+    {
+      "event_id": "evt_2",
+      "type": "road_congestion",
+      "severity": "moderate",
+      "mode": "car",
+      "road": "Victoria Embankment",
+      "headline": "Heavy traffic on Victoria Embankment",
+      "detail": "Slow-moving traffic westbound approaching Westminster. Adds ~8 minutes.",
+      "affected_leg_ids": ["leg_4_1"],
+      "affected_route_ids": ["route_4"],
+      "delay_min": 8,
+      "active": true,
+      "starts_at": "2026-06-06T08:30:00+01:00",
+      "expected_clear_at": "2026-06-06T11:00:00+01:00",
+      "advice": "Car journey already slow and subject to congestion charge; public transport or cycle preferred."
+    },
+    {
+      "event_id": "evt_3",
+      "type": "planned_works",
+      "severity": "info",
+      "mode": "cycle",
+      "road": "Embankment / CS3",
+      "headline": "Minor cycleway diversion on CS3",
+      "detail": "Short signed diversion near Blackfriars due to maintenance. Minimal time impact.",
+      "affected_leg_ids": ["leg_3_2"],
+      "affected_route_ids": ["route_3"],
+      "delay_min": 2,
+      "active": true,
+      "starts_at": "2026-06-06T06:00:00+01:00",
+      "expected_clear_at": "2026-06-06T18:00:00+01:00",
+      "advice": "Follow signed diversion; cycle route remains viable and fully step-free."
+    }
+  ],
+  "reroute_logic_hint": {
+    "comment": "Guidance for the agent (not a hard rule). When an active severe event affects the recommended route, prefer an alternative route whose legs are not in any active severe event's affected_leg_ids. Factor in user constraints (e.g. step_free required -> consult accessibility_data.json).",
+    "demo_expected_outcome": "route_1 (recommended) is hit by evt_1 (severe Central line delay). Agent should reroute to route_2 (Circle line, direct, unaffected) for transit users, or surface route_3 (cycle) if the user wants step-free + low cost. route_4 (car) is discouraged due to evt_2 + congestion charge."
+  }
+}

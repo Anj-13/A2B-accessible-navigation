@@ -1,0 +1,72 @@
+{
+  "description": "Step-free / accessibility info for stations and docks on the demo routes. Keyed by station_id, referenced from route leg from/to ids. Source: representative of TfL Step-Free Access open data.",
+  "legend": {
+    "step_free_to_platform": "Level access from street to platform",
+    "step_free_to_train": "Level access all the way onto the train (platform-train gap manageable for wheelchair)",
+    "none": "No step-free access; stairs/escalators only"
+  },
+  "stations": {
+    "940GZZLULVT": {
+      "name": "Liverpool Street",
+      "step_free_to_platform": true,
+      "step_free_to_train": false,
+      "lifts": true,
+      "notes": "Step-free to platform via lift; manual ramp may be needed to board.",
+      "accessibility_level": "partial"
+    },
+    "940GZZLUBND": {
+      "name": "Bond Street",
+      "step_free_to_platform": true,
+      "step_free_to_train": true,
+      "lifts": true,
+      "notes": "Fully step-free following station upgrade.",
+      "accessibility_level": "full"
+    },
+    "940GZZLUWSM": {
+      "name": "Westminster",
+      "step_free_to_platform": true,
+      "step_free_to_train": true,
+      "lifts": true,
+      "notes": "Step-free to Jubilee line platforms; District/Circle partial.",
+      "accessibility_level": "full"
+    },
+    "910GLIVST": {
+      "name": "Liverpool Street (National Rail)",
+      "step_free_to_platform": true,
+      "step_free_to_train": true,
+      "lifts": true,
+      "notes": "Step-free national rail concourse.",
+      "accessibility_level": "full"
+    },
+    "dock_wormwood": {
+      "name": "Santander Dock: Wormwood Street",
+      "step_free_to_platform": true,
+      "step_free_to_train": true,
+      "lifts": false,
+      "notes": "Street-level cycle dock; inherently step-free but requires ability to cycle.",
+      "accessibility_level": "full"
+    },
+    "dock_storeys_gate": {
+      "name": "Santander Dock: Storey's Gate",
+      "step_free_to_platform": true,
+      "step_free_to_train": true,
+      "lifts": false,
+      "notes": "Street-level cycle dock.",
+      "accessibility_level": "full"
+    },
+    "dest_westminster": {
+      "name": "Westminster (Houses of Parliament)",
+      "step_free_to_platform": true,
+      "step_free_to_train": true,
+      "lifts": false,
+      "notes": "Street-level destination.",
+      "accessibility_level": "full"
+    }
+  },
+  "route_accessibility_summary": {
+    "route_1": {"fully_step_free": false, "reason": "Liverpool Street is not step-free to train on the Central line platform."},
+    "route_2": {"fully_step_free": false, "reason": "Circle line platforms at Liverpool Street/Westminster are only partially step-free."},
+    "route_3": {"fully_step_free": true, "reason": "Cycle route is street-level throughout, but requires ability to cycle."},
+    "route_4": {"fully_step_free": true, "reason": "Door-to-door car; no platform access required."}
+  }
+}
