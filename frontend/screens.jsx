@@ -236,11 +236,17 @@ function RouteScreen({ dest, mode, route, spd, onStart, onBack, onSetMode, onSee
 
   // Fetch real accessibility recommendation whenever destination or mode changes
   uE(() => {
+    let cancelled = false;
     setApiResult(null);
     setApiLoading(true);
     fetchRouteRecommendation(dest, mode, userProfile || {})
-      .then((r) => { setApiResult(r); setApiLoading(false); });
-  }, [dest, mode]);
+      .then((r) => {
+        if (cancelled) return;
+        setApiResult(r);
+        setApiLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [dest, mode, userProfile]);
 
   // Prefer API ETA (from the scored route) when available, fall back to hardcoded
   const rec = apiResult && apiResult.recommendedRoute;

@@ -29,7 +29,8 @@ npm run demo
 npm start
 ```
 
-The server listens on `http://localhost:3000` by default.
+The server listens on `http://localhost:3000` by default and serves both the
+A2B frontend and the route recommendation API from that address.
 
 If port 3000 is unavailable:
 

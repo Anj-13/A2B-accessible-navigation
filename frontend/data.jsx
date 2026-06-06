@@ -125,8 +125,10 @@ function getAlternatives(dest, mode) {
 
 // ─── Backend integration ──────────────────────────────────────────────────────
 
-// API base URL — change to your machine IP when testing across devices
-const API_BASE = 'http://localhost:3000';
+// Use the server that delivered the app so custom ports and LAN hosts work.
+const API_BASE = location.protocol === 'http:' || location.protocol === 'https:'
+  ? location.origin
+  : 'http://localhost:3000';
 
 // Route payloads mirroring route_data.json; used for backend accessibility scoring.
 // tube: two real alternatives (Central+Jubilee vs Circle/District)
