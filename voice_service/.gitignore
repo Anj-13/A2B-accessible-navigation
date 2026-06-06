@@ -1,0 +1,8 @@
+.env
+*.env
+output.mp3
+*.mp3
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

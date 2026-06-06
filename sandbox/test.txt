@@ -1,0 +1,315 @@
+================================================================================
+                    PLANNER AGENT - FILE REFERENCE GUIDE
+================================================================================
+
+This guide explains every file in your sandbox and what it does.
+Share this with your teammates so everyone understands the integration points.
+
+
+================================================================================
+                              CORE AGENT FILES
+================================================================================
+
+FILE: planner_agent_v2.py
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Main agent (USE THIS ONE FOR DEMO)
+- Takes text questions like "How do I get to Heathrow?"
+- Loads route data and user preferences
+- Calls the local AI model (gpt-oss:120b)
+- Returns natural language responses
+- Automatically logs everything to memory
+
+HOW TO RUN:
+python3 /sandbox/planner_agent_v2.py
+
+WHAT IT READS:
+- data/route_options.json (from Data teammate)
+- data/preferences.json (from Route Logic teammate)
+
+WHAT IT WRITES:
+- data/recommendation.json (for Frontend teammate)
+- memory.json (conversation history)
+
+
+FILE: planner_agent.py
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Backup agent (JSON mode)
+- Same as v2 but tries to force JSON responses
+- Has fallback when JSON parsing fails
+
+HOW TO RUN:
+python3 /sandbox/planner_agent.py
+
+WHEN TO USE:
+- Only if v2 has problems. v2 is better for voice.
+
+
+================================================================================
+                            MEMORY SYSTEM FILES
+================================================================================
+
+FILE: memory.py
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Stores every user question and agent response
+- Saves to memory.json file
+- Can recall conversations from specific time windows
+
+KEY FUNCTIONS:
+- log_user_query(text) - Saves user's question
+- log_agent_response(text) - Saves agent's answer
+- get_events_since(minutes) - Recalls last X minutes
+- get_full_session() - Gets entire conversation history
+
+WHEN TO USE:
+- Never directly. The planner agent calls it automatically.
+
+
+FILE: memory.json
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Stores all conversation history
+- Human-readable JSON format
+- Persists even if agent restarts
+
+WHAT IT LOOKS LIKE:
+[
+  {
+    "timestamp": "2025-06-07T10:00:00",
+    "event_type": "user_query",
+    "content": {"text": "How do I get to Paddington?"},
+    "session_id": "bounty_session"
+  },
+  {
+    "timestamp": "2025-06-07T10:00:05",
+    "event_type": "agent_response",
+    "content": {"text": "Take the Circle Line..."},
+    "session_id": "bounty_session"
+  }
+]
+
+WHEN TO USE:
+- Judges will look at this to verify memory persistence for the bounty.
+
+
+FILE: test_memory.py
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Tests if memory system is working
+- Stores a test fact and tries to recall it
+
+HOW TO RUN:
+python3 /sandbox/test_memory.py
+
+EXPECTED OUTPUT:
+Testing Memory System for 71-Minute Bounty
+==================================================
+✓ Cleared previous test session
+✓ Stored: 'The judge's name is Alex'
+✓ Memory now contains 2 events
+✓ Memory recall successful!
+
+WHEN TO USE:
+- Run this before the bounty to verify memory works
+
+
+FILE: show_memory.sh
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Prints entire conversation history in readable format
+- Shows timestamp of every event
+
+HOW TO RUN:
+./show_memory.sh
+
+WHEN TO USE:
+- During the demo to prove memory persistence to judges
+
+
+================================================================================
+                          DATA INTEGRATION FILES
+================================================================================
+
+FILE: data/route_options.json
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Stores available transit routes
+- Planner agent reads this file
+
+FORMAT REQUIRED:
+[
+  {
+    "route_id": "piccadilly_line",
+    "name": "Piccadilly Line",
+    "stops": ["King's Cross", "Hyde Park Corner", "Heathrow"],
+    "travel_time_minutes": 45,
+    "step_free_access": true,
+    "crowdedness": "moderate"
+  }
+]
+
+WHO WRITES THIS: Data teammate
+WHO READS THIS: Planner agent (you)
+
+
+FILE: data/preferences.json
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Stores user preferences (accessibility, transfers, etc.)
+
+FORMAT REQUIRED:
+{
+  "wheelchair_access_required": false,
+  "max_transfers": 2,
+  "preferred_travel_time_minutes": 30,
+  "avoid_stairs": false
+}
+
+WHO WRITES THIS: Route Logic teammate
+WHO READS THIS: Planner agent (you)
+
+
+FILE: data/recommendation.json
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Stores agent's final recommendation
+- Frontend reads this to display on map
+
+FORMAT:
+{
+  "recommended_route": "piccadilly_line",
+  "estimated_time_minutes": 45,
+  "reason": "Fastest route with step-free access",
+  "accessibility_notes": "Step-free at all stations"
+}
+
+WHO WRITES THIS: Planner agent (you)
+WHO READS THIS: Frontend teammate
+
+
+================================================================================
+                             UTILITY FILES
+================================================================================
+
+FILE: run_agent.sh
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Shows memory count then launches planner agent
+
+HOW TO RUN:
+./run_agent.sh
+
+
+FILE: sandbox_files.tar.gz
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Backup archive containing all files
+- Used to transfer files between computers
+
+WHEN TO USE:
+- For backup or sharing with teammates
+
+
+FILE: AGENT_REFERENCE.md (this file)
+-------------------------------------------------------------------------------
+WHAT IT DOES:
+- Explains every file to you and your team
+
+WHEN TO USE:
+- Read it. Share it. Keep it.
+
+
+================================================================================
+                            FILE RELATIONSHIPS
+================================================================================
+
+DATA TEAMMATE (writes route_options.json)
+        │
+        ▼
+ROUTE LOGIC TEAMMATE (writes preferences.json)
+        │
+        ▼
+PLANNER AGENT (planner_agent_v2.py)
+    reads: route_options.json, preferences.json
+    calls: gpt-oss:120b (local LLM on DGX Spark)
+    writes: recommendation.json, memory.json
+        │
+        ├──────────► FRONTEND TEAMMATE (reads recommendation.json)
+        │
+        └──────────► JUDGES (view memory.json for bounty)
+
+
+================================================================================
+                            QUICK REFERENCE CARD
+================================================================================
+
+File                          | Purpose                          | Who touches it
+------------------------------|----------------------------------|-------------------------------
+planner_agent_v2.py           | Main agent (USE THIS)            | You (run this)
+planner_agent.py              | Backup agent                     | You (backup only)
+memory.py                     | Memory system                    | You (don't edit)
+memory.json                   | Conversation storage             | Judges (verify bounty)
+test_memory.py                | Memory test                      | You (run before bounty)
+show_memory.sh                | Memory viewer                    | You (demo to judges)
+data/route_options.json       | Route data                       | Data teammate (writes)
+data/preferences.json         | User preferences                 | Route Logic teammate (writes)
+data/recommendation.json      | Agent output                     | Frontend teammate (reads)
+run_agent.sh                  | Quick start                      | You
+sandbox_files.tar.gz          | Backup archive                   | You
+
+
+================================================================================
+                         DEMO SCRIPT FOR JUDGES
+================================================================================
+
+Say this during your demo:
+
+"The planner agent runs in this NemoClaw sandbox on the DGX Spark.
+
+It reads route data from data/route_options.json and user preferences from
+data/preferences.json.
+
+It then calls the local gpt-oss:120b model - a 120 billion parameter model
+running entirely on the Spark's 128GB unified memory.
+
+The response is written to data/recommendation.json for the frontend,
+and everything is logged to memory.json.
+
+To prove we satisfy the 71-minute memory bounty, you can run ./show_memory.sh
+to see the complete conversation history with timestamps."
+
+
+================================================================================
+                    COMMANDS CHEAT SHEET
+================================================================================
+
+Connect to sandbox:
+nemoclaw my-assistant connect
+
+Run the main agent:
+python3 /sandbox/planner_agent_v2.py
+
+Test memory system:
+python3 /sandbox/test_memory.py
+
+View memory for judges:
+./show_memory.sh
+
+Check all files:
+ls -la /sandbox/
+
+View route data:
+cat /sandbox/data/route_options.json
+
+View preferences:
+cat /sandbox/data/preferences.json
+
+View recommendation output:
+cat /sandbox/data/recommendation.json
+
+
+================================================================================
+                               END OF GUIDE
+================================================================================
