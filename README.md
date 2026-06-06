@@ -1,6 +1,6 @@
 # NVIDIA Hack-for-Impact Challenge
 
-### Team: NetRunner 
+### Team: NetRunner
 **Members :** 
 
 ## Route recommendation engine
