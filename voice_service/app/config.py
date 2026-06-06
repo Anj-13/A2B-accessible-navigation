@@ -19,6 +19,10 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:120b")
 OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "30"))
 ROUTE_API_BASE_URL = os.getenv("ROUTE_API_BASE_URL", "http://127.0.0.1:3000")
 ROUTE_API_TIMEOUT_SECONDS = float(os.getenv("ROUTE_API_TIMEOUT_SECONDS", "5"))
+STT_MODEL = os.getenv("STT_MODEL", "scribe_v2")
+STT_LANGUAGE_CODE = os.getenv("STT_LANGUAGE_CODE", "eng") or None
+STT_RECORD_SECONDS = float(os.getenv("STT_RECORD_SECONDS", "7"))
+STT_SAMPLE_RATE = int(os.getenv("STT_SAMPLE_RATE", "16000"))
 
 def validate_api_key(raise_on_missing: bool = False) -> bool:
     """Validate that the ElevenLabs API key is available.

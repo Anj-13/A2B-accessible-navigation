@@ -1,6 +1,8 @@
 "use strict";
 
 const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
 const { URL } = require("node:url");
 
 const { demoScenarios } = require("./demoScenarios");
@@ -10,6 +12,18 @@ const { recommendRoute } = require("./scoreRoute");
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
 const MAX_BODY_BYTES = 1_000_000;
+const FRONTEND_DIR = path.join(__dirname, "frontend");
+const FRONTEND_ENTRY = path.join(FRONTEND_DIR, "A2B Prototype.html");
+const CONTENT_TYPES = Object.freeze({
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".js": "text/javascript; charset=utf-8",
+  ".jsx": "text/javascript; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+});
 
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
@@ -19,6 +33,42 @@ function sendJson(response, statusCode, body) {
     "Content-Type": "application/json; charset=utf-8",
   });
   response.end(JSON.stringify(body, null, 2));
+}
+
+function sendFile(response, filePath) {
+  const contentType =
+    CONTENT_TYPES[path.extname(filePath).toLowerCase()] ??
+    "application/octet-stream";
+
+  response.writeHead(200, {
+    "Content-Type": contentType,
+    "X-Content-Type-Options": "nosniff",
+  });
+  fs.createReadStream(filePath).pipe(response);
+}
+
+function getFrontendFile(pathname) {
+  if (pathname === "/") return FRONTEND_ENTRY;
+
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(pathname);
+  } catch {
+    return null;
+  }
+
+  const relativePath = decodedPath.replace(/^\/+/, "");
+  const filePath = path.resolve(FRONTEND_DIR, relativePath);
+  const relativeToFrontend = path.relative(FRONTEND_DIR, filePath);
+
+  if (
+    relativeToFrontend.startsWith("..") ||
+    path.isAbsolute(relativeToFrontend)
+  ) {
+    return null;
+  }
+
+  return filePath;
 }
 
 function readJsonBody(request) {
@@ -118,6 +168,20 @@ async function requestHandler(request, response) {
       });
     }
     return;
+  }
+
+  if (request.method === "GET") {
+    const filePath = getFrontendFile(url.pathname);
+    if (filePath) {
+      try {
+        if (fs.statSync(filePath).isFile()) {
+          sendFile(response, filePath);
+          return;
+        }
+      } catch {
+        // Fall through to the JSON 404 response.
+      }
+    }
   }
 
   sendJson(response, 404, { error: "Route not found." });

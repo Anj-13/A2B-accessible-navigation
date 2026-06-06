@@ -60,6 +60,9 @@ def infer_user_profile(
     if preferred_modes:
         profile["preferredModes"] = preferred_modes
 
+    if "wheelchair" in text:
+        profile["avoidModes"] = ["cycle"]
+
     return profile
 
 

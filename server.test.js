@@ -70,3 +70,32 @@ test("POST /api/recommend-from-data uses the merged JSON files", async (context)
   assert.equal(response.status, 200);
   assert.equal(body.recommendedRoute.id, "route_2");
 });
+
+test("GET / serves the merged frontend", async (context) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(() => server.close());
+
+  const address = server.address();
+  const response = await fetch(`http://127.0.0.1:${address.port}/`);
+  const body = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /^text\/html/);
+  assert.match(body, /<div id="root"><\/div>/);
+  assert.match(body, /src="app\.jsx"/);
+});
+
+test("GET /app.jsx serves frontend assets", async (context) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(() => server.close());
+
+  const address = server.address();
+  const response = await fetch(`http://127.0.0.1:${address.port}/app.jsx`);
+  const body = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /^text\/javascript/);
+  assert.match(body, /function App\(\)/);
+});

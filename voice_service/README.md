@@ -53,6 +53,30 @@ The demo calls the route recommendation API first, injects the scored route into
 the local Ollama prompt, then synthesizes the response. It falls back gracefully
 if either local service is unavailable.
 
+Microphone input:
+
+```powershell
+python -m app.main --microphone
+```
+
+The default recording window is seven seconds. Override it with:
+
+```powershell
+python -m app.main --microphone --record-seconds 10
+```
+
+Transcribe an existing audio file:
+
+```powershell
+python -m app.main --audio request.wav
+```
+
+Typed input remains available through the normal prompt or:
+
+```powershell
+python -m app.main --text "Take me to Westminster without stairs"
+```
+
 Test the Ollama integration with a local server running:
 
 ```powershell
@@ -69,7 +93,8 @@ python -c "import requests; print(requests.get('http://localhost:11434/api/tags'
 Notes
 
 - `app/tts.py` uses the official ElevenLabs SDK. If the package is missing, the code will raise a helpful error.
-- `app/stt.py` is a placeholder interface with TODOs for microphone and STT integration.
+- `app/stt.py` records a WAV from the default microphone and transcribes it
+  using ElevenLabs Scribe v2.
 - Conversation history is stored in `conversation_history.json` at the `voice_service` root.
 - `app/llm.py` uses plain HTTP requests against Ollama and logs connection or JSON errors clearly.
 

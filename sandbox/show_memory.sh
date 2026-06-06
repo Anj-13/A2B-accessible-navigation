@@ -1,9 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MEMORY_FILE="${SANDBOX_MEMORY_FILE:-$SCRIPT_DIR/memory.json}"
 echo "=== FULL SESSION MEMORY ==="
 echo "Timestamp: $(date)"
 echo ""
 echo "Memory File Contents:"
 echo "---------------------"
-cat /sandbox/memory.json 2>/dev/null | python3 -m json.tool || echo "No memory file yet"
+python3 -m json.tool "$MEMORY_FILE" 2>/dev/null || echo "No memory file yet"
 echo ""
 echo "=== END OF MEMORY ==="
