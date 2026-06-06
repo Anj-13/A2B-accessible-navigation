@@ -1,0 +1,7 @@
+{
+    "wheelchair_access_required": false,
+    "max_transfers": 2,
+    "preferred_travel_time_minutes": 30,
+    "crowdedness_tolerance": "moderate",
+    "avoid_stairs": false
+}

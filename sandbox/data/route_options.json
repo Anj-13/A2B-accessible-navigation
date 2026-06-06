@@ -1,0 +1,11 @@
+[
+    {
+        "route_id": "piccadilly_line",
+        "name": "Piccadilly Line",
+        "stops": ["King's Cross", "Hyde Park Corner", "Heathrow Terminal 5"],
+        "travel_time_minutes": 45,
+        "step_free_access": true,
+        "crowdedness": "moderate",
+        "frequency_minutes": 5
+    }
+]
