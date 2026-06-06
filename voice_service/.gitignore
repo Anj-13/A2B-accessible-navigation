@@ -2,6 +2,8 @@
 *.env
 output.mp3
 *.mp3
+microphone_input.wav
+*.wav
 __pycache__/
 *.pyc
 *.pyo
