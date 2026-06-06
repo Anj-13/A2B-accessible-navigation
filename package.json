@@ -5,6 +5,8 @@
   "description": "Accessibility-aware London route recommendation engine",
   "main": "scoreRoute.js",
   "scripts": {
+    "demo:check": "bash scripts/demo_preflight.sh",
+    "demo:dgx": "bash scripts/dgx_ollama_tunnel.sh",
     "demo": "node runDemo.js",
     "start": "node server.js",
     "test": "node --test"

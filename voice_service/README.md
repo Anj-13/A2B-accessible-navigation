@@ -5,30 +5,30 @@ Minimal voice service for the NVIDIA Hack for Impact — accessibility-aware nav
 This subpackage implements a small Python-based voice subsystem using the official ElevenLabs SDK.
 It now includes a lightweight Ollama chat step before TTS so the voice pipeline can act as a local assistant.
 
-Prerequisites
+## Prerequisites
 
 - Python 3.9+
 - An ElevenLabs API key
 
-Quick setup
+## Quick Setup
 
 1. Create a virtual environment and activate it:
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+```bash
+python3 -m venv voice_service/.venv
+source voice_service/.venv/bin/activate
 ```
 
 2. Install dependencies:
 
-```powershell
-pip install -r requirements.txt
+```bash
+python3 -m pip install -r voice_service/requirements.txt
 ```
 
 3. Copy the example env and set your API key:
 
-```powershell
-copy .env.example .env
+```bash
+cp voice_service/.env.example voice_service/.env
 # then edit .env and set ELEVENLABS_API_KEY
 ```
 
@@ -39,13 +39,13 @@ copy .env.example .env
 - `OLLAMA_TIMEOUT_SECONDS` defaults to `30`
 - `ROUTE_API_BASE_URL` defaults to `http://127.0.0.1:3000`
 
-Usage
+## Usage
 
-- From the repository root you can run the demo by changing into the `voice_service` folder and running the module:
+- From the repository root:
 
-```powershell
-cd voice_service
-python -m app.main
+```bash
+source voice_service/.venv/bin/activate
+python3 -m voice_service.app.main
 ```
 
 This will prompt for a user message, save the conversation to `conversation_history.json`, and synthesize `output.mp3`.
@@ -55,40 +55,42 @@ if either local service is unavailable.
 
 Microphone input:
 
-```powershell
-python -m app.main --microphone
+```bash
+python3 -m voice_service.app.main --microphone
 ```
 
 The default recording window is seven seconds. Override it with:
 
-```powershell
-python -m app.main --microphone --record-seconds 10
+```bash
+python3 -m voice_service.app.main --microphone --record-seconds 10
 ```
 
 Transcribe an existing audio file:
 
-```powershell
-python -m app.main --audio request.wav
+```bash
+python3 -m voice_service.app.main --audio request.wav
 ```
 
 Typed input remains available through the normal prompt or:
 
-```powershell
-python -m app.main --text "Take me to Westminster without stairs"
+```bash
+python3 -m voice_service.app.main --text "Take me to Westminster without stairs"
 ```
 
 Test the Ollama integration with a local server running:
 
-```powershell
-cd voice_service
-python -m app.main
+```bash
+python3 -m voice_service.app.main
 ```
 
 If you want to check the Ollama endpoint before running the demo:
 
-```powershell
-python -c "import requests; print(requests.get('http://localhost:11434/api/tags', timeout=5).status_code)"
+```bash
+curl http://127.0.0.1:11434/api/tags
 ```
+
+For the complete Mac + NVIDIA DGX Spark workflow, see
+[`../DEMO_RUNBOOK.md`](../DEMO_RUNBOOK.md).
 
 Notes
 

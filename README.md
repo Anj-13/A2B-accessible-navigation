@@ -32,6 +32,14 @@ npm start
 The server listens on `http://localhost:3000` by default and serves both the
 A2B frontend and the route recommendation API from that address.
 
+For the full voice and NVIDIA DGX Spark demo, follow
+[`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md). The main readiness commands are:
+
+```bash
+npm run demo:check
+npm run demo:dgx
+```
+
 If port 3000 is unavailable:
 
 ```bash
