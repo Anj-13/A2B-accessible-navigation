@@ -25,8 +25,8 @@ const API_BASE = location.protocol === 'http:' || location.protocol === 'https:'
   ? location.origin
   : 'http://localhost:3000';
 
-// Voice service base URL (Python FastAPI, port 5001)
-const VOICE_BASE = 'http://localhost:5001';
+// Voice service — proxied through the Node server at the same origin
+const VOICE_BASE = '';
 
 // Request the user's real GPS location. Resolves to [lat, lng].
 // Falls back to Piccadilly Circus if denied or outside London.

@@ -3,7 +3,6 @@ try { require("fs").readFileSync(".env","utf8").split("\n").forEach(l=>{ const [
 
 const fs = require("node:fs");
 const http = require("node:http");
-const fs = require("node:fs");
 const path = require("node:path");
 const { URL } = require("node:url");
 
@@ -50,13 +49,15 @@ function loadDestRouteFile(destId) {
 }
 
 const PORT = Number(process.env.PORT) || 3000;
-const HOST = process.env.HOST || "127.0.0.1";
+const HOST = process.env.HOST || "0.0.0.0";
 const MAX_BODY_BYTES = 1_000_000;
 const FRONTEND_DIR = path.join(__dirname, "frontend");
+const VOICE_PORT = Number(process.env.VOICE_PORT) || 5001;
 const FRONTEND_ENTRY = path.join(FRONTEND_DIR, "A2B Prototype.html");
 const CONTENT_TYPES = Object.freeze({
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
+  ".ico":  "image/x-icon",
   ".jpeg": "image/jpeg",
   ".jpg": "image/jpeg",
   ".js": "text/javascript; charset=utf-8",
@@ -64,6 +65,15 @@ const CONTENT_TYPES = Object.freeze({
   ".png": "image/png",
   ".svg": "image/svg+xml",
 });
+
+function proxyToVoice(request, response) {
+  const proxyReq = http.request(
+    { hostname: "127.0.0.1", port: VOICE_PORT, path: request.url, method: request.method, headers: request.headers },
+    (proxyRes) => { response.writeHead(proxyRes.statusCode, proxyRes.headers); proxyRes.pipe(response); }
+  );
+  proxyReq.on("error", () => sendJson(response, 502, { error: "Voice service unavailable." }));
+  request.pipe(proxyReq);
+}
 
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
@@ -237,34 +247,47 @@ async function requestHandler(request, response) {
     }
   }
 
+  // Proxy voice service endpoints through to localhost:5001
+  if (url.pathname === "/stt" || url.pathname === "/respond") {
+    proxyToVoice(request, response);
+    return;
+  }
+
   sendJson(response, 404, { error: "Route not found." });
 }
 
 function createServer() {
+  const certPath = path.join(__dirname, "cert.pem");
+  const keyPath  = path.join(__dirname, "key.pem");
+  if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+    const https = require("node:https");
+    return https.createServer(
+      { cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) },
+      requestHandler
+    );
+  }
   return http.createServer(requestHandler);
 }
 
 if (require.main === module) {
   const server = createServer();
+  const usingHttps = fs.existsSync(path.join(__dirname, "cert.pem"));
 
   server.on("error", (error) => {
     if (error.code === "EADDRINUSE") {
-      console.error(
-        `Port ${PORT} is already in use. Try: PORT=3001 npm start`,
-      );
+      console.error(`Port ${PORT} is already in use. Try: PORT=3001 npm start`);
     } else if (error.code === "EPERM") {
-      console.error(
-        `Permission denied while starting on ${HOST}:${PORT}. Try another port with: PORT=3001 npm start`,
-      );
+      console.error(`Permission denied on ${HOST}:${PORT}. Try: PORT=3001 npm start`);
     } else {
-      console.error("Failed to start route recommendation API:", error);
+      console.error("Failed to start:", error);
     }
-
     process.exitCode = 1;
   });
 
   server.listen(PORT, HOST, () => {
-    console.log(`Route recommendation API listening on http://${HOST}:${PORT}`);
+    const proto = usingHttps ? "https" : "http";
+    console.log(`A2B listening on ${proto}://${HOST}:${PORT}`);
+    if (usingHttps) console.log("HTTPS enabled — microphone will work on mobile.");
   });
 }
 

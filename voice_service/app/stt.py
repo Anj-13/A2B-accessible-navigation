@@ -119,3 +119,8 @@ class STT:
             duration_seconds=duration_seconds,
         )
         return self.transcribe(audio_path)
+
+
+def transcribe(audio_path: str) -> str:
+    """Module-level wrapper so server.py can do: from .stt import transcribe."""
+    return STT().transcribe(audio_path)
