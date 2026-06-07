@@ -1,0 +1,227 @@
+# Rerouting System — Implementation Plan
+
+---
+
+## Context
+The current prototype only selects a best route once at journey start. This plan introduces a two-group agent architecture: an **Analyzer Agent** that selects the best route from TfL data based on user constraints, and a **Guide Agent** that monitors the journey every 20 seconds and triggers a reroute popup if a significantly better option appears.
+
+---
+
+## Architecture Overview
+
+```
+User taps Bus or TfL button
+        │
+        ▼
+┌─────────────────┐
+│  Analyzer Agent │  ← runs on backend (Node.js)
+│  (bus OR tfl)   │  ← calls scoreRoute.js ranking
+└────────┬────────┘
+         │ bestRoute + allRoutes
+         ▼
+  RouteScreen / RoutesScreen
+         │ "Start journey"
+         ▼
+┌──────────────────┐
+│   Guide Agent    │  ← runs in frontend (OnRouteScreen)
+│  (polling loop)  │  ← GPS watchPosition + 20s interval
+└────────┬─────────┘
+         │ delay on next step detected
+         ▼
+  Reroute Popup (15s auto-accept)
+```
+
+---
+
+## Part 1 — Analyzer Agent
+
+### Mode Groups
+| Button label | `transportGroup` | Modes included |
+|---|---|---|
+| Bus | `bus` | `bus` only |
+| TfL | `tfl` | `bus` + `tube` + `train` |
+| Car / Walk | unchanged | existing single-mode filter |
+
+### Backend changes
+
+**`server.js`** — new endpoint `POST /api/analyze-route`
+- Accepts `{ destinationId, transportGroup, userProfile, currentRouteId, currentLegId }`
+- `transportGroup: 'bus'` → `modeFilter: 'bus'`
+- `transportGroup: 'tfl'` → no single modeFilter — filter routes where `mode ∈ ['bus','tube','train']` after loading
+- Calls existing `buildRecommendationInput()` + `recommendRoute()` — no new scoring logic
+- Returns `{ bestRoute, allRoutes, explanation, shouldReroute, rerouteTrigger }`
+
+**`dataIntegration.js`** — extend `buildRecommendationInput` to accept `modeSet: string[]`
+- If `modeSet` provided: `routes.filter(r => modeSet.includes(r.mode))`
+- If `modeFilter` (single string) provided: existing behaviour unchanged
+- If neither: all routes
+
+### Accessibility scoring (within existing `scoreRoute.js`)
+The existing penalty weights already handle this correctly:
+- Accessibility users: step-free penalty (+100), lift-out-of-service (+120), walking×1.5, transfers×4
+- Regular users: ETA weight dominates
+
+No changes needed to `scoreRoute.js`.
+
+### Frontend mode changes
+
+**`frontend/data.jsx`** — add `analyzeBusRoute` and `analyzeTflRoute` helpers that call `POST /api/analyze-route`
+
+**`frontend/screens.jsx` (ConvoScreen)** — replace the 4-mode tile grid with:
+- Bus tile (`transportGroup: 'bus'`)
+- TfL tile (`transportGroup: 'tfl'`, bus + underground)
+- Car tile (unchanged)
+- Walk tile (unchanged)
+
+---
+
+## Part 2 — Guide Agent (frontend polling loop)
+
+### GPS tracking upgrade
+- Replace one-shot `getUserLocation()` in `app.jsx` with `navigator.geolocation.watchPosition()` so `originCoord` updates in real-time during the onroute screen
+
+### Current-step detection
+In OnRouteScreen, track which leg the user is on:
+- Compare live GPS to each leg's `to` coord using Haversine distance
+- "Current leg" = the first leg whose `to` coord is more than 50m ahead
+- "Next step" = leg immediately after current leg
+
+### 20-second polling loop
+```
+setInterval (20s) — only while screen === 'onroute' AND GPS is moving (speed > 0 or position changed)
+  → POST /api/analyze-route with:
+      { destinationId, transportGroup, userProfile,
+        currentRouteId: activeRoute.id,
+        currentLegId: detectedCurrentLeg.leg_id }
+  → if shouldReroute === true AND newRoute.id !== activeRoute.id:
+      → show RerouteModal
+```
+
+### RerouteModal
+- Uses existing `.modal-backdrop` + `.modal` CSS (already in styles.css)
+- 15-second countdown displayed
+- "Stay on route" button → dismiss, cancel timer
+- If timer reaches 0 → auto-accept: update `activeRoute`, continue guiding
+- Structure similar to existing `ModeMenu` component in screens.jsx (lines 295-312)
+
+### Route caching
+- Guide Agent holds only `activeRoute` (the chosen route object) in state
+- `alternativeRoutes` from the Analyzer are stored in a ref (not state) — available for reroute comparison without causing re-renders
+- On reroute: swap `activeRoute` to `newRoute`, update ref
+
+---
+
+## Files to modify
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `server.js` | Add `POST /api/analyze-route` endpoint |
+| 2 | `dataIntegration.js` | Add `modeSet` array filter to `buildRecommendationInput` |
+| 3 | `frontend/data.jsx` | Add `analyzeBusRoute` + `analyzeTflRoute` helpers |
+| 4 | `frontend/screens.jsx` (ConvoScreen) | Replace mode tiles: Bus / TfL / Car / Walk |
+| 5 | `frontend/screens.jsx` (OnRouteScreen) | Add Guide Agent polling loop, step detection, RerouteModal |
+| 6 | `frontend/app.jsx` | Replace `getUserLocation()` with `watchPosition` for live coords |
+
+---
+
+## Follow-up questions for you
+
+**Q1 — Agent implementation style**: Should the Analyzer Agent be:
+- **(A) A deterministic function** — extend existing `scoreRoute.js` / `dataIntegration.js` logic (fast, no extra dependencies)
+- **(B) An LLM-backed agent** — use Claude API or Ollama to reason about route trade-offs in natural language (slower, adds the AI layer that the hackathon is built around)
+
+**Q2 — TfL button placement**: Should the existing "Tube/Underground" button be *replaced* by the TfL tile, or should TfL be a *5th option* added alongside the current 4?
+
+**Q3 — Reroute check scope**: When the Guide Agent polls every 20 seconds, should it:
+- **(A) Only alert if the NEXT step specifically has a delay/disruption** (as described)
+- **(B) Also alert if there's a completely better route that avoids the current one entirely** (e.g., take bus instead of tube)
+
+**Q4 — Real TfL API vs static data**: For the prototype, should the Analyzer call the real TfL Journey Planner API for live disruption data, or continue using the static `route_data_*.json` + `traffic_events.json` files (with manually set `active: true` events for demo purposes)?
+
+**Q5 — GPS "is moving" detection**: Should the 20-second polling fire:
+- **(A) Always** while on the onroute screen (even if stationary)
+- **(B) Only when GPS position has changed** since the last poll
+
+---
+
+## Verification (after implementation)
+1. Tap Bus → only bus routes shown → best bus route selected
+2. Tap TfL → bus + tube routes shown → best overall selected
+3. Start journey → GPS updates → 20s poll fires → check browser network tab
+4. Manually set `active: true` on a traffic event in `traffic_events.json` that affects the next leg → reroute modal appears → 15s timer counts down → auto-reroutes
+
+---
+
+# Full-Stack Code Audit — Implementation Plan (completed)
+
+## Context
+Audit of backend (Node.js), frontend (browser React), and ElevenLabs voice service for the A2B Route prototype. No live DGX Spark connection — verified by code correctness only. The following bugs were confirmed and decisions made for each.
+
+---
+
+## Bug 1 — Wrong ElevenLabs voice (VOICE_NAME=alloy)
+**Decision**: Use voice ID `2ajXGJNYBR0iNHpS4VZb` directly.
+
+**Files to change**:
+- `voice_service/.env` — add `VOICE_ID=2ajXGJNYBR0iNHpS4VZb`, keep VOICE_NAME for fallback
+- `voice_service/app/config.py` — add `VOICE_ID = os.getenv("VOICE_ID", "")` export
+- `voice_service/app/tts.py` — if `VOICE_ID` is set, skip `_resolve_voice_id()` and use it directly in `client.text_to_speech.convert(voice_id=VOICE_ID, ...)`
+
+---
+
+## Bug 2 — Web app has no TTS response
+**Decision**: Add TTS only for follow-up LLM responses (when user asks a question after destination is known).
+
+**Files to change**:
+- `voice_service/app/server.py` — add `POST /respond` endpoint that accepts `{transcript, destinationId}`, calls `llm.generate_response()`, calls `tts.synthesize()`, returns the audio as `audio/mpeg` bytes
+- `frontend/data.jsx` — add `async function askVoiceQuestion(transcript, destId)` that POSTs to `${VOICE_BASE}/respond` and returns an `AudioBuffer` / object URL
+- `frontend/app.jsx` — after STT completes, if a `dest` is already selected (user is on ConvoScreen or later), call `askVoiceQuestion` and play the audio response using `new Audio(url).play()`
+
+---
+
+## Bug 3 — `dataIntegration.js` loads route_data.json unnecessarily
+**Decision**: Leave as-is. Not worth changing.
+
+---
+
+## Bug 4 — Baker Street has no car route
+**Decision**: Add a car route to `route_data_baker.json`.
+
+**File to change**:
+- `route_data_baker.json` — add a new route object with `id: "baker_car"`, `primary_mode: "car"`, `mode: "car"`, reasonable ETA (~25 min from Piccadilly Circus), `step_free: true`, `lift_available: false`, `ramp_available: false`, `liftStatus: "unknown"`, `crowding_level: "low"`, plus a leg array with one car leg.
+
+---
+
+## Bug 5 — Tube/bus map paths use car road routing (OSRM driving)
+**Decision**: Deferred — will revisit after getting better requirements for map functionality.
+
+---
+
+## Bug 6 — `matchTranscriptToDest` word-length filter
+**Decision**: Leave as-is. Placeholder destinations will be replaced with real data later.
+
+---
+
+## Security — Real ElevenLabs API key in `.env`
+**Decision**: Flag at final AI implementation stage. Not touching now.
+
+---
+
+## Files to modify (in order)
+
+| # | File | What changes |
+|---|------|-------------|
+| 1 | `voice_service/.env` | Add `VOICE_ID=2ajXGJNYBR0iNHpS4VZb` |
+| 2 | `voice_service/app/config.py` | Export `VOICE_ID` |
+| 3 | `voice_service/app/tts.py` | Use `VOICE_ID` directly if set |
+| 4 | `voice_service/app/server.py` | Add `POST /respond` endpoint |
+| 5 | `frontend/data.jsx` | Add `askVoiceQuestion()` helper |
+| 6 | `frontend/app.jsx` | Call TTS on follow-up voice input |
+| 7 | `route_data_baker.json` | Add car route `baker_car` |
+---
+
+## Verification
+
+1. **Voice ID fix**: Run `python -m app.main` in voice_service, confirm no "voice not found" warning, audio plays with correct voice.
+2. **Web TTS**: Record a question on ConvoScreen, confirm audio plays back in browser (check browser console for no CORS errors on port 5001).
+3. **Baker car route**: Select Baker Street → Car mode → confirm response returns a route with `mode: "car"` and ETA in the 20–30 min range.
