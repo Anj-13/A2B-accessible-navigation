@@ -1,0 +1,109 @@
+<
+input id="json-response" 
+type="hidden" 
+value="[
+    {
+        "$type":"Tfl.Api.Presentation.Entities.Prediction, Tfl.Api.Presentation.Entities",
+        "id":"-1800092620",
+        "operationType":1,
+        "vehicleId":"BV66VGA",
+        "naptanId":"490015567G2",
+        "stationName":"Lordship Lane",
+        "lineId":"123",
+        "lineName":"123",
+        "platformName":"G",
+        "direction":"outbound",
+        "bearing":"157",
+        "tripId":"609976",
+        "baseVersion":"20260606",
+        "destinationNaptanId":"",
+        "destinationName":"Ilford, Hainault Street",
+        "timestamp":"2026-06-07T01:40:44.6726311Z",
+        "timeToStation":57,
+        "currentLocation":"",
+        "towards":"Turnpike Lane",
+        "expectedArrival":"2026-06-07T01:41:41Z",
+        "timeToLive":"2026-06-07T01:42:11Z",
+        "modeName":"bus",
+        "timing":
+        {
+            "$type":"Tfl.Api.Presentation.Entities.PredictionTiming, Tfl.Api.Presentation.Entities",
+            "countdownServerAdjustment":"-00:00:03.1680436",
+            "source":"2026-06-07T00:50:20.057Z",
+            "insert":"2026-06-07T01:39:41.974Z",
+            "read":"2026-06-07T01:39:38.797Z",
+            "sent":"2026-06-07T01:40:44Z",
+            "received":"0001-01-01T00:00:00Z"
+        }
+    },
+    {
+        "$type":"Tfl.Api.Presentation.Entities.Prediction, Tfl.Api.Presentation.Entities",
+        "id":"498948305",
+        "operationType":1,
+        "vehicleId":"LJ13FBX",
+        "naptanId":"490015567G2",
+        "stationName":"Lordship Lane",
+        "lineId":"n29",
+        "lineName":"N29",
+        "platformName":"G",
+        "direction":"outbound",
+        "bearing":"157",
+        "tripId":"593976",
+        "baseVersion":"20260606",
+        "destinationNaptanId":"",
+        "destinationName":"Trafalgar Square",
+        "timestamp":"2026-06-07T01:40:44.6726311Z",
+        "timeToStation":206,
+        "currentLocation":"",
+        "towards":"Turnpike Lane",
+        "expectedArrival":"2026-06-07T01:44:10Z",
+        "timeToLive":"2026-06-07T01:44:40Z",
+        "modeName":"bus",
+        "timing":
+        {
+            "$type":"Tfl.Api.Presentation.Entities.PredictionTiming, Tfl.Api.Presentation.Entities",
+            "countdownServerAdjustment":"-00:00:03.1776666",
+            "source":"2026-06-07T00:50:20.057Z",
+            "insert":"2026-06-07T01:40:22.008Z",
+            "read":"2026-06-07T01:40:18.831Z",
+            "sent":"2026-06-07T01:40:44Z",
+            "received":"0001-01-01T00:00:00Z"
+        }
+    },
+    {
+        "$type":"Tfl.Api.Presentation.Entities.Prediction, Tfl.Api.Presentation.Entities",
+        "id":"-1222579517",
+        "operationType":1,
+        "vehicleId":"LJ13FCF",
+        "naptanId":"490015567G2",
+        "stationName":"Lordship Lane",
+        "lineId":"n29",
+        "lineName":"N29",
+        "platformName":"G",
+        "direction":"outbound",
+        "bearing":"157",
+        "tripId":"593997",
+        "baseVersion":"20260606",
+        "destinationNaptanId":"",
+        "destinationName":"Trafalgar Square",
+        "timestamp":"2026-06-07T01:40:44.6726311Z",
+        "timeToStation":856,
+        "currentLocation":"",
+        "towards":"Turnpike Lane",
+        "expectedArrival":"2026-06-07T01:55:00Z",
+        "timeToLive":"2026-06-07T01:55:30Z",
+        "modeName":"bus",
+        "timing":
+        {
+            "$type":"Tfl.Api.Presentation.Entities.PredictionTiming, Tfl.Api.Presentation.Entities",
+            "countdownServerAdjustment":"-00:00:03.1769405",
+            "source":"2026-06-07T00:50:20.057Z",
+            "insert":"2026-06-07T01:40:22.008Z",
+            "read":"2026-06-07T01:40:18.831Z",
+            "sent":"2026-06-07T01:40:44Z",
+            "received":"0001-01-01T00:00:00Z"
+        }
+    },
+    {
+        "$type":"Tfl.Api.Presentation.Entities.Prediction, Tfl.Api.Presentation.Entities","id":"-1356625646","operationType":1,"vehicleId":"LJ13FDA","naptanId":"490015567G2","stationName":"Lordship Lane","lineId":"n29","lineName":"N29","platformName":"G","direction":"outbound","bearing":"157","tripId":"593898","baseVersion":"20260606","destinationNaptanId":"","destinationName":"Trafalgar Square","timestamp":"2026-06-07T01:40:44.6726311Z","timeToStation":1336,"currentLocation":"","towards":"Turnpike Lane","expectedArrival":"2026-06-07T02:03:00Z","timeToLive":"2026-06-07T02:03:30Z","modeName":"bus","timing":{"$type":"Tfl.Api.Presentation.Entities.PredictionTiming, Tfl.Api.Presentation.Entities","countdownServerAdjustment":"-00:00:03.1756635","source":"2026-06-07T00:50:20.057Z","insert":"2026-06-07T01:40:32.015Z","read":"2026-06-07T01:40:28.838Z","sent":"2026-06-07T01:40:44Z","received":"0001-01-01T00:00:00Z"}},{"$type":"Tfl.Api.Presentation.Entities.Prediction, Tfl.Api.Presentation.Entities","id":"19427243","operationType":1,"vehicleId":"LK66HCO","naptanId":"490015567G2","stationName":"Lordship Lane","lineId":"n29","lineName":"N29","platformName":"G","direction":"outbound","bearing":"157","tripId":"593882","baseVersion":"20260606","destinationNaptanId":"","destinationName":"Trafalgar Square","timestamp":"2026-06-07T01:40:44.6726311Z","timeToStation":726,"currentLocation":"","towards":"Turnpike Lane","expectedArrival":"2026-06-07T01:52:50Z","timeToLive":"2026-06-07T01:53:20Z","modeName":"bus","timing":{"$type":"Tfl.Api.Presentation.Entities.PredictionTiming, Tfl.Api.Presentation.Entities","countdownServerAdjustment":"-00:00:03.1762032","source":"2026-06-07T00:50:20.057Z","insert":"2026-06-07T01:40:01.983Z","read":"2026-06-07T01:39:58.805Z","sent":"2026-06-07T01:40:44Z","received":"0001-01-01T00:00:00Z"}},{"$type":"Tfl.Api.Presentation.Entities.Prediction, Tfl.Api.Presentation.Entities","id":"-2005042022","operationType":1,"vehicleId":"BF65WJK","naptanId":"490015567G2","stationName":"Lordship Lane","lineId":"n91","lineName":"N91","platformName":"G","direction":"outbound","bearing":"157","tripId":"263475","baseVersion":"20260606","destinationNaptanId":"","destinationName":"Trafalgar Square","timestamp":"2026-06-07T01:40:44.6726311Z","timeToStation":510,"currentLocation":"","towards":"Turnpike Lane","expectedArrival":"2026-06-07T01:49:14Z","timeToLive":"2026-06-07T01:49:44Z","modeName":"bus","timing":{"$type":"Tfl.Api.Presentation.Entities.PredictionTiming, Tfl.Api.Presentation.Entities","countdownServerAdjustment":"-00:00:03.1712402","source":"2026-06-07T00:50:20.057Z","insert":"2026-06-07T01:40:22.008Z","read":"2026-06-07T01:40:18.831Z","sent":"2026-06-07T01:40:44Z","received":"0001-01-01T00:00:00Z"}}]"
+>

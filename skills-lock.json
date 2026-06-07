@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "setup-api-key": {
+      "source": "elevenlabs/skills",
+      "sourceType": "github",
+      "skillPath": "setup-api-key/SKILL.md",
+      "computedHash": "21e65e9ea2d4b7633bfd4f537822a44fe5a2cd294c4d4517c26eab29445b2151"
+    },
+    "speech-to-text": {
+      "source": "elevenlabs/skills",
+      "sourceType": "github",
+      "skillPath": "speech-to-text/SKILL.md",
+      "computedHash": "e3bdf8267fbf5762fc379d928379058b2461bf74fadf11bb4bc8347a53baf843"
+    },
+    "text-to-speech": {
+      "source": "elevenlabs/skills",
+      "sourceType": "github",
+      "skillPath": "text-to-speech/SKILL.md",
+      "computedHash": "58648bd4ced042dc17c035505a2984ca82f1a373be68e6e083e0a317b76893a4"
+    }
+  }
+}

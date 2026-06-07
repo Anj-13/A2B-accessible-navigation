@@ -22,6 +22,13 @@ function loadDataFiles() {
   };
 }
 
+function loadSupportingFiles() {
+  return {
+    accessibilityData: loadJson(DATA_FILES.accessibility),
+    trafficData: loadJson(DATA_FILES.traffic),
+  };
+}
+
 function getActiveEventsForRoute(route, trafficData) {
   const routeId = route.id ?? route.route_id;
   const legIds = new Set((route.legs ?? []).map((leg) => leg.leg_id));
@@ -81,11 +88,23 @@ function buildRecommendationInput({
   currentRouteId,
   journeyTime,
   rerouteThreshold,
+  routeData: preloadedRouteData,
+  modeFilter,
+  modeSet,
 } = {}) {
-  const { routeData, accessibilityData, trafficData } = loadDataFiles();
-  const routes = (routeData.routes ?? []).map((route) =>
+  const { routeData: defaultRouteData, accessibilityData, trafficData } = loadDataFiles();
+  const routeData = preloadedRouteData ?? defaultRouteData;
+  let routes = (routeData.routes ?? []).map((route) =>
     adaptDataRoute(route, accessibilityData, trafficData),
   );
+
+  if (modeSet && modeSet.length > 0) {
+    const filtered = routes.filter((r) => modeSet.includes(r.mode ?? r.primary_mode));
+    if (filtered.length > 0) routes = filtered;
+  } else if (modeFilter) {
+    const filtered = routes.filter((r) => (r.mode ?? r.primary_mode) === modeFilter);
+    if (filtered.length > 0) routes = filtered;
+  }
 
   if (routes.length === 0) {
     throw new Error("route_data.json does not contain any routes.");
@@ -119,4 +138,5 @@ module.exports = {
   buildRecommendationInput,
   getActiveEventsForRoute,
   loadDataFiles,
+  loadSupportingFiles,
 };

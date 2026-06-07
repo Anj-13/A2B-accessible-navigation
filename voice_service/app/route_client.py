@@ -70,6 +70,7 @@ def get_route_recommendation(
     user_message: str,
     conversation_context: Optional[List[Dict[str, str]]] = None,
     current_route_id: Optional[str] = None,
+    destination_id: Optional[str] = None,
 ) -> Optional[Dict[str, object]]:
     """Call the route engine and return None if it is unavailable."""
     url = f"{ROUTE_API_BASE_URL.rstrip('/')}/api/recommend-from-data"
@@ -78,6 +79,8 @@ def get_route_recommendation(
     }
     if current_route_id:
         payload["currentRouteId"] = current_route_id
+    if destination_id:
+        payload["destinationId"] = destination_id
 
     try:
         response = requests.post(
