@@ -1,11 +1,26 @@
 "use strict";
 
+const fs = require("node:fs");
 const http = require("node:http");
+const path = require("node:path");
 const { URL } = require("node:url");
 
 const { demoScenarios } = require("./demoScenarios");
 const { buildRecommendationInput } = require("./dataIntegration");
 const { recommendRoute } = require("./scoreRoute");
+
+const DEST_ROUTE_FILES = {
+  baker:  "route_data_baker.json",
+  museum: "route_data_museum.json",
+  camden: "route_data_camden.json",
+  tower:  "route_data_tower.json",
+  kings:  "route_data_kings.json",
+};
+
+function loadDestRouteFile(destId) {
+  const filename = DEST_ROUTE_FILES[destId] || "route_data.json";
+  return JSON.parse(fs.readFileSync(path.join(__dirname, filename), "utf8"));
+}
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -87,14 +102,27 @@ async function requestHandler(request, response) {
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/destinations") {
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(__dirname, "destinations.json"), "utf8"));
+      sendJson(response, 200, data);
+    } catch (error) {
+      sendJson(response, 500, { error: "Could not load destinations." });
+    }
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/recommend-from-data") {
     try {
       const body = await readJsonBody(request);
+      const destId = body.destinationId ?? body.destination_id ?? null;
       const input = buildRecommendationInput({
         userProfile: body.userProfile ?? body.user_profile ?? {},
         currentRouteId: body.currentRouteId ?? body.current_route_id,
         journeyTime: body.journeyTime ?? body.journey_time,
         rerouteThreshold: body.rerouteThreshold ?? body.reroute_threshold,
+        routeData: destId ? loadDestRouteFile(destId) : undefined,
+        modeFilter: body.mode ?? null,
       });
       sendJson(response, 200, recommendRoute(input));
     } catch (error) {

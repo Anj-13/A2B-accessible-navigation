@@ -1,5 +1,4 @@
-// screens.jsx — A2B screen components. Relies on window globals from
-// icons.jsx, data.jsx, map.jsx.
+// screens.jsx — A2B screen components
 const { useState: uS, useEffect: uE, useRef: uR } = React;
 
 /* ---------- shared header ---------- */
@@ -9,58 +8,63 @@ function Header({ onBack }) {
       <span className="a2b__logo"><LogoA2B style={{ height: 34 }} /></span>
       <span className="a2b__net"><span className="dot" />Live</span>
     </div>);
-
 }
 
 /* ---------- HOME ---------- */
-function HomeScreen({ phase, transcript, onMic, onSaved, onSearch }) {
-  const listening = phase === 'listening';
+function HomeScreen({ phase, transcript, countdown, onMic, onSearch }) {
+  const active = phase === 'recording' || phase === 'requesting' || phase === 'processing';
+  const isRecording  = phase === 'recording';
+  const isProcessing = phase === 'processing';
+  const isRequesting = phase === 'requesting';
+
+  let statusText;
+  if (isRequesting)  statusText = 'Starting microphone…';
+  else if (isRecording)  statusText = `Recording — ${countdown}s remaining`;
+  else if (isProcessing) statusText = transcript || 'Transcribing…';
+  else statusText = null;
+
   return (
     <div className="a2b">
       <Header />
       <div className="a2b__body">
         <div className="shortcuts">
-          <div className="tile shortcut" onClick={() => onSaved('home')}>
-            <IconHome size={54} />
-          </div>
-          <div className="tile shortcut" onClick={() => onSaved('work')}>
-            <IconWork size={56} />
-          </div>
           <div className="tile shortcut" onClick={onSearch}>
             <IconSearch size={50} />
           </div>
         </div>
 
         <div className="micwrap">
-          <div className={'mic' + (listening ? ' is-listening' : '')} onClick={onMic}>
-            {listening && <span className="mic__halo" />}
-            {listening && <span className="mic__halo h2" />}
-            <span className={'mic__core' + (listening ? '' : ' off')}>
-              {listening ? <IconMic size={74} /> : <IconMicOff size={100} />}
+          <div className={'mic' + (active ? ' is-listening' : '')} onClick={onMic}>
+            {active && <span className="mic__halo" />}
+            {active && <span className="mic__halo h2" />}
+            <span className={'mic__core' + (active ? '' : ' off')}>
+              {active ? <IconMic size={74} /> : <IconMicOff size={100} />}
             </span>
           </div>
 
-          {listening ?
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, minHeight: 60 }}>
-              <div className="eq"><span /><span /><span /><span /><span /></div>
+          {active ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, minHeight: 60 }}>
+              {isRecording && <div className="eq"><span /><span /><span /><span /><span /></div>}
               <div style={{ fontSize: 15, fontWeight: 700, maxWidth: 250, textAlign: 'center', minHeight: 20 }}>
-                {transcript}<span style={{ opacity: .4 }}>{transcript ? '' : 'Listening…'}</span>
+                {statusText}
               </div>
-            </div> :
-
-          <div className="mic__hint">Tap &amp; speak your destination</div>
-          }
+              {isRecording && (
+                <div style={{ fontSize: 12, opacity: 0.5 }}>Tap again to cancel</div>
+              )}
+            </div>
+          ) : (
+            <div className="mic__hint">Tap &amp; speak your destination</div>
+          )}
         </div>
       </div>
     </div>);
-
 }
 
 /* ---------- destination picker ---------- */
-function PickerScreen({ onPick, onBack }) {
+function PickerScreen({ destinations, onPick, onBack }) {
   const [q, setQ] = uS('');
   const norm = q.trim().toLowerCase();
-  const list = DESTINATIONS.filter((d) => (d.name + ' ' + d.area).toLowerCase().includes(norm));
+  const list = destinations.filter((d) => (d.name + ' ' + d.area).toLowerCase().includes(norm));
   return (
     <div className="a2b">
       <Header />
@@ -76,7 +80,6 @@ function PickerScreen({ onPick, onBack }) {
               placeholder="Search destinations…"
               value={q}
               onChange={(e) => setQ(e.target.value)} />
-            
           </div>
           {list.map((d) =>
           <div key={d.id} className="dest" onClick={() => onPick(d)}>
@@ -88,12 +91,13 @@ function PickerScreen({ onPick, onBack }) {
               <IconBack size={20} style={{ transform: 'rotate(180deg)', opacity: .4 }} />
             </div>
           )}
-          {list.length === 0 &&
-          <div className="picker__empty">No matches for “{q}”.</div>}
+          {list.length === 0 && destinations.length > 0 &&
+          <div className="picker__empty">No matches for "{q}".</div>}
+          {destinations.length === 0 &&
+          <div className="picker__empty">Loading destinations…</div>}
         </div>
       </div>
     </div>);
-
 }
 
 /* ---------- CONVERSATION + transport choice ---------- */
@@ -101,10 +105,10 @@ function ConvoScreen({ dest, spd, onPick, onBack, userProfile, onProfileChange }
   const [showOptions, setShowOptions] = uS(false);
   const [aiReady, setAiReady] = uS(false);
   uE(() => {
-    setShowOptions(false);setAiReady(false);
+    setShowOptions(false); setAiReady(false);
     const t1 = setTimeout(() => setAiReady(true), 1200 / spd);
     const t2 = setTimeout(() => setShowOptions(true), 1700 / spd);
-    return () => {clearTimeout(t1);clearTimeout(t2);};
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [dest, spd]);
 
   const accessibilityRequired = (userProfile || {}).accessibilityRequired || false;
@@ -124,7 +128,6 @@ function ConvoScreen({ dest, spd, onPick, onBack, userProfile, onProfileChange }
           <div className="bubble ai">
             {!aiReady ?
             <span className="typing"><i /><i /><i /></span> :
-
             <span className="enter">
                 <span className="line">Sure thing — routing to <b>{dest.name}</b>.</span>
                 <span className="line">How do you want to get there?</span>
@@ -137,12 +140,12 @@ function ConvoScreen({ dest, spd, onPick, onBack, userProfile, onProfileChange }
         <>
           <div className="transport enter">
             {MODES.map((m) => {
-            const I = MODE_ICON[m.id];
-            return (
-              <div key={m.id} className="tile opt" onClick={() => onPick(m.id)}>
+              const I = MODE_ICON[m.id];
+              return (
+                <div key={m.id} className="tile opt" onClick={() => onPick(m.id)}>
                   <I size={34} />
                 </div>);
-          })}
+            })}
           </div>
           <div className="acc-pref enter">
             <div
@@ -157,10 +160,9 @@ function ConvoScreen({ dest, spd, onPick, onBack, userProfile, onProfileChange }
         }
       </div>
     </div>);
-
 }
 
-/* ---------- ACCESSIBILITY PANEL (shows live backend data) ---------- */
+/* ---------- ACCESSIBILITY PANEL (live backend data) ---------- */
 function AccessibilityPanel({ result, loading }) {
   if (loading) {
     return (
@@ -173,19 +175,18 @@ function AccessibilityPanel({ result, loading }) {
   if (!result || !result.recommendedRoute) return null;
 
   const rec = result.recommendedRoute;
-  const stepFree    = rec.stepFree;
-  const liftOk      = rec.liftAvailable && rec.liftStatus !== 'out_of_service';
-  const hasLift     = rec.liftAvailable;
-  const crowding    = rec.crowdingLevel || 'low';
-  const disrupted   = (rec.disruptionMinutes || 0) > 0;
-  const confidence  = result.confidence != null ? Math.round(result.confidence * 100) : null;
+  const stepFree  = rec.stepFree ?? rec.step_free;
+  const liftOk    = (rec.liftAvailable ?? rec.lift_available) && (rec.liftStatus ?? rec.lift_status) !== 'out_of_service';
+  const hasLift   = rec.liftAvailable ?? rec.lift_available;
+  const crowding  = rec.crowdingLevel ?? rec.crowding_level ?? 'low';
+  const disrupted = ((rec.disruptionMinutes ?? rec.disruption_minutes) || 0) > 0;
   const explanation = result.explanation || '';
 
   const crowdLabel = crowding === 'high' ? '● Busy' : crowding === 'medium' ? '● Moderate' : '● Quiet';
 
   return (
     <div className="acc-panel enter">
-      <div className="acc-title">AI Accessibility Check</div>
+      <div className="acc-title">Accessibility Check</div>
       <div className="acc-badges">
         <span className={'acc-badge ' + (stepFree ? 'acc-ok' : 'acc-warn')}>
           {stepFree ? '♿ Step-free' : '⚠ Not step-free'}
@@ -201,7 +202,7 @@ function AccessibilityPanel({ result, loading }) {
       </div>
       {disrupted && (
         <div className="acc-disruption">
-          ⚠ {rec.disruptionMinutes} min delays reported on this route
+          ⚠ {rec.disruptionMinutes ?? rec.disruption_minutes} min delays reported on this route
         </div>
       )}
       {explanation && (
@@ -209,20 +210,12 @@ function AccessibilityPanel({ result, loading }) {
           {explanation.length > 110 ? explanation.slice(0, 110) + '…' : explanation}
         </div>
       )}
-      {confidence != null && (
-        <div className="acc-confidence">
-          <div className="acc-conf-bar">
-            <div className="acc-conf-fill" style={{ width: confidence + '%' }} />
-          </div>
-          <span className="acc-conf-label">AI confidence {confidence}%</span>
-        </div>
-      )}
     </div>
   );
 }
 
 /* ---------- ROUTE PREVIEW ---------- */
-function RouteScreen({ dest, mode, route, spd, onStart, onBack, onSetMode, onSeeMore, userProfile }) {
+function RouteScreen({ dest, mode, spd, onStart, onBack, onSetMode, onSeeMore, onApiResult, userProfile, originCoord }) {
   const [drawn, setDrawn] = uS(false);
   const [modeMenu, setModeMenu] = uS(false);
   const [apiResult, setApiResult] = uS(null);
@@ -232,22 +225,21 @@ function RouteScreen({ dest, mode, route, spd, onStart, onBack, onSetMode, onSee
     setDrawn(false);
     const t = setTimeout(() => setDrawn(true), 250 / spd);
     return () => clearTimeout(t);
-  }, [dest, mode, route, spd]);
+  }, [dest, mode, spd]);
 
-  // Fetch real accessibility recommendation whenever destination or mode changes
   uE(() => {
     setApiResult(null);
     setApiLoading(true);
-    fetchRouteRecommendation(dest, mode, userProfile || {})
-      .then((r) => { setApiResult(r); setApiLoading(false); });
+    fetchRouteRecommendation(dest.id, mode, userProfile || {})
+      .then((r) => { setApiResult(r); setApiLoading(false); if (onApiResult) onApiResult(r); });
   }, [dest, mode]);
 
-  // Prefer API ETA (from the scored route) when available, fall back to hardcoded
   const rec = apiResult && apiResult.recommendedRoute;
-  const info = {
-    ...route,
-    eta: rec ? rec.etaMinutes : route.eta,
-  };
+  const eta  = rec ? (rec.etaMinutes ?? rec.eta_minutes ?? '—') : '…';
+  const line = rec ? (rec.summary || mode) : mode;
+  const detail = apiResult && apiResult.explanation
+    ? (apiResult.explanation.length > 60 ? apiResult.explanation.slice(0, 60) + '…' : apiResult.explanation)
+    : '';
 
   const ModeI = MODE_ICON[mode];
 
@@ -258,12 +250,12 @@ function RouteScreen({ dest, mode, route, spd, onStart, onBack, onSetMode, onSee
         <div className="backchip" onClick={onBack}><IconBack /></div>
         <div className="maparea">
           <div className="mapframe enter">
-            <LeafletMap dest={dest} mode={mode} drawn={drawn} spd={spd} />
+            <LeafletMap dest={dest} mode={mode} drawn={drawn} spd={spd} originCoord={originCoord} />
           </div>
         </div>
         <div className="routecard">
           <div className="routecard__label">
-            <span>{info.optimal ? 'Optimal route' : 'Selected route'}</span>
+            <span>Recommended route</span>
             <span className="more" onClick={() => setModeMenu(true)}>change mode ↻</span>
           </div>
           <div className="card">
@@ -271,30 +263,29 @@ function RouteScreen({ dest, mode, route, spd, onStart, onBack, onSetMode, onSee
               <div className="card__line">
                 <span className="modepill"><ModeI size={20} /></span>
                 <div>
-                  <div className="nm-line">{info.line}</div>
-                  <div className="card__sub">{info.detail}</div>
+                  <div className="nm-line">{line}</div>
+                  {detail && <div className="card__sub">{detail}</div>}
                 </div>
               </div>
-              <div className="card__big">{info.eta}<small>min</small></div>
+              <div className="card__big">{eta}<small>min</small></div>
             </div>
           </div>
           <AccessibilityPanel result={apiResult} loading={apiLoading} />
           <div className="routebtns">
-            <button className="cta" onClick={onStart}>Start journey ›</button>
+            <button className="cta" onClick={() => onStart(apiResult)}>Start journey ›</button>
             <button className="cta ghost seemore" onClick={onSeeMore}>See more ↪</button>
           </div>
         </div>
 
         {modeMenu &&
         <ModeMenu current={mode} onClose={() => setModeMenu(false)}
-        onPick={(m) => {setModeMenu(false);if (m !== mode) onSetMode(m);}} />
+          onPick={(m) => { setModeMenu(false); if (m !== mode) onSetMode(m); }} />
         }
       </div>
     </div>);
-
 }
 
-/* ---------- CHANGE-MODE POPUP (2×2) ---------- */
+/* ---------- CHANGE-MODE POPUP ---------- */
 function ModeMenu({ current, onPick, onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -308,54 +299,76 @@ function ModeMenu({ current, onPick, onClose }) {
                 <I size={40} />
                 <span className="opt__label" style={{ color: "rgb(15, 17, 12)", fontSize: "14px", padding: "0px", height: "1px" }}>{m.label}</span>
               </div>);
-
           })}
         </div>
       </div>
     </div>);
-
 }
 
 /* ---------- ALTERNATIVE ROUTES ---------- */
-function RoutesScreen({ dest, mode, current, onPick, onBack }) {
-  const alts = getAlternatives(dest, mode);
+function RoutesScreen({ dest, mode, apiResult, onPick, onBack }) {
   const ModeI = MODE_ICON[mode];
+  const modeName = MODES.find((m) => m.id === mode)?.label || mode;
+
+  // Build alternatives list from backend response
+  const alternatives = [];
+  if (apiResult) {
+    if (apiResult.recommendedRoute) {
+      alternatives.push({ ...apiResult.recommendedRoute, label: 'Recommended' });
+    }
+    (apiResult.alternativeRoutes || []).forEach((r) => {
+      alternatives.push(r);
+    });
+  }
+
   return (
     <div className="a2b">
       <Header />
       <div className="a2b__body" style={{ position: 'relative' }}>
         <div className="backchip" onClick={onBack}><IconBack /></div>
         <div className="picker enter">
-          <h2 style={{ marginTop: 40 }}>{MODES.find((m) => m.id === mode).label} · routes to {dest.name}</h2>
-          {alts.map((a, i) =>
-          <div key={i} className={'dest route-alt' + (i === current ? ' is-sel' : '')} onClick={() => onPick(i)}>
-              <span className="pin"><ModeI size={20} /></span>
-              <div className="meta">
-                <div className="nm">{a.line}{a.optimal ? ' · optimal' : ''}</div>
-                <div className="ds">{a.detail}</div>
-              </div>
-              <div className="alt-eta">{a.eta}<small>min</small></div>
-            </div>
+          <h2 style={{ marginTop: 40 }}>{modeName} · routes to {dest.name}</h2>
+          {alternatives.length === 0 && (
+            <div className="picker__empty">No alternative routes available.</div>
           )}
+          {alternatives.map((a, i) => {
+            const eta = a.etaMinutes ?? a.eta_minutes ?? '—';
+            const summary = a.summary || modeName;
+            return (
+              <div key={i} className={'dest route-alt' + (i === 0 ? ' is-sel' : '')} onClick={() => onPick(i)}>
+                <span className="pin"><ModeI size={20} /></span>
+                <div className="meta">
+                  <div className="nm">{summary}{a.label ? ` · ${a.label}` : ''}</div>
+                  <div className="ds">{a.isClosed || a.is_closed ? '⚠ Closed' : (a.crowdingLevel || a.crowding_level || '')}</div>
+                </div>
+                <div className="alt-eta">{eta}<small>min</small></div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>);
-
 }
 
 /* ---------- ON ROUTE (live) ---------- */
-function OnRouteScreen({ dest, mode, route, spd, onArrive, onBack }) {
-  const info = route;
+function OnRouteScreen({ dest, mode, activeRoute, spd, onArrive, onBack, originCoord }) {
   const ModeI = MODE_ICON[mode];
-  const [remaining, setRemaining] = uS(info.eta);
-  const lastMin = uR(info.eta);
+  const eta = activeRoute ? (activeRoute.etaMinutes ?? activeRoute.eta_minutes ?? 0) : 0;
+  const line = activeRoute ? (activeRoute.summary || mode) : mode;
+
+  const [remaining, setRemaining] = uS(eta);
+  const lastMin = uR(eta);
   const arrivedGuard = uR(false);
 
-  uE(() => {setRemaining(info.eta);lastMin.current = info.eta;arrivedGuard.current = false;}, [dest, mode, route]);
+  uE(() => {
+    setRemaining(eta);
+    lastMin.current = eta;
+    arrivedGuard.current = false;
+  }, [dest, mode, activeRoute]);
 
   const handleProgress = (frac) => {
-    const rem = Math.max(0, Math.ceil(info.eta * (1 - frac)));
-    if (rem !== lastMin.current) {lastMin.current = rem;setRemaining(rem);}
+    const rem = Math.max(0, Math.ceil(eta * (1 - frac)));
+    if (rem !== lastMin.current) { lastMin.current = rem; setRemaining(rem); }
     if (frac > 0.985 && !arrivedGuard.current) {
       arrivedGuard.current = true;
       setTimeout(onArrive, 400);
@@ -369,19 +382,19 @@ function OnRouteScreen({ dest, mode, route, spd, onArrive, onBack }) {
         <div className="backchip" onClick={onBack}><IconBack /></div>
         <div className="maparea">
           <div className="mapframe enter">
-            <LeafletMap dest={dest} mode={mode} drawn live spd={spd} onProgress={handleProgress} />
+            <LeafletMap dest={dest} mode={mode} drawn live spd={spd} originCoord={originCoord} onProgress={handleProgress} />
           </div>
         </div>
         <div className="routecard">
           <div className="routecard__label">
-            <span className="ticker"><span className="live" />On route · {MODES.find((m) => m.id === mode).verb}</span>
+            <span className="ticker"><span className="live" />On route · {MODES.find((m) => m.id === mode)?.verb || mode}</span>
           </div>
           <div className="card">
             <div className="card__row">
               <div className="card__line">
                 <span className="modepill"><ModeI size={20} /></span>
                 <div>
-                  <div className="nm-line">{info.line}</div>
+                  <div className="nm-line">{line}</div>
                   <div className="card__sub">to {dest.name}</div>
                 </div>
               </div>
@@ -395,7 +408,6 @@ function OnRouteScreen({ dest, mode, route, spd, onArrive, onBack }) {
         </div>
       </div>
     </div>);
-
 }
 
 /* ---------- ARRIVAL ---------- */
@@ -411,7 +423,6 @@ function ArrivalSheet({ dest }) {
         </div>
       </div>
     </div>);
-
 }
 
 Object.assign(window, {

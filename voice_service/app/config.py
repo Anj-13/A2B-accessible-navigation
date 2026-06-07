@@ -14,6 +14,7 @@ load_dotenv(dotenv_path=_env_path)
 # Environment-configured values
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 VOICE_NAME = os.getenv("VOICE_NAME", "alloy")
+VOICE_ID = os.getenv("VOICE_ID", "")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:120b")
 OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "30"))

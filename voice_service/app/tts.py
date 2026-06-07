@@ -6,7 +6,7 @@ functions will raise an explanatory error when called.
 """
 from pathlib import Path
 from typing import Optional
-from .config import ELEVENLABS_API_KEY, VOICE_NAME
+from .config import ELEVENLABS_API_KEY, VOICE_NAME, VOICE_ID
 
 
 def synthesize(text: str, output_path: Optional[str] = None, voice_name: Optional[str] = None) -> str:
@@ -31,7 +31,7 @@ def synthesize(text: str, output_path: Optional[str] = None, voice_name: Optiona
     client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 
     voice_to_use = voice_name or VOICE_NAME
-    voice_id = _resolve_voice_id(client, voice_to_use)
+    voice_id = VOICE_ID or _resolve_voice_id(client, voice_to_use)
 
     # `convert` returns an iterator of audio bytes that the SDK `save` helper can write
     audio = client.text_to_speech.convert(

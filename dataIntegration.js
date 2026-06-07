@@ -81,11 +81,19 @@ function buildRecommendationInput({
   currentRouteId,
   journeyTime,
   rerouteThreshold,
+  routeData: preloadedRouteData,
+  modeFilter,
 } = {}) {
-  const { routeData, accessibilityData, trafficData } = loadDataFiles();
-  const routes = (routeData.routes ?? []).map((route) =>
+  const { routeData: defaultRouteData, accessibilityData, trafficData } = loadDataFiles();
+  const routeData = preloadedRouteData ?? defaultRouteData;
+  let routes = (routeData.routes ?? []).map((route) =>
     adaptDataRoute(route, accessibilityData, trafficData),
   );
+
+  if (modeFilter) {
+    const filtered = routes.filter((r) => (r.mode ?? r.primary_mode) === modeFilter);
+    if (filtered.length > 0) routes = filtered;
+  }
 
   if (routes.length === 0) {
     throw new Error("route_data.json does not contain any routes.");

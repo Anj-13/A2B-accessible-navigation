@@ -1,4 +1,4 @@
-// app.jsx — A2B prototype: state machine + tweaks + Android frame.
+// app.jsx — A2B prototype: state machine + tweaks + Android frame
 (function () {
 const { useState, useEffect, useRef } = React;
 
@@ -7,22 +7,24 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "reduceMotion": false
 }/*EDITMODE-END*/;
 
+const RECORD_MS = 15000; // recording duration in ms
+
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const spd = (t.reduceMotion ? 100 : t.speed) || 1;
 
-  // optional deep-link: ?screen=route&dest=baker&mode=car
-  const qp = new URLSearchParams(location.search);
-  const qpDest = DESTINATIONS.find(d => d.id === qp.get('dest')) || SAVED[qp.get('dest')];
-  const qpScreen = qp.get('screen');
+  const [destinations, setDestinations] = useState([]);
+  const [originCoord, setOriginCoord] = useState(null);
+  const [screen, setScreen] = useState('home');
 
-  const [screen, setScreen] = useState(['picker','convo','route','routes','onroute'].includes(qpScreen) ? qpScreen : 'home');
-  const [phase, setPhase] = useState('idle');     // idle|listening (home only)
-  const [dest, setDest] = useState(qpDest || DESTINATIONS[0]);
-  const [mode, setMode] = useState(['car','bus','tube','walk'].includes(qp.get('mode')) ? qp.get('mode') : 'tube');
-  const [altIdx, setAltIdx] = useState(0);
+  // phase: 'idle' | 'requesting' | 'recording' | 'processing'
+  const [phase, setPhase] = useState('idle');
+  const [countdown, setCountdown] = useState(15);
   const [transcript, setTranscript] = useState('');
-  // User accessibility profile — drives backend scoring
+
+  const [dest, setDest] = useState(null);
+  const [mode, setMode] = useState('tube');
+  const [apiResult, setApiResult] = useState(null);
   const [userProfile, setUserProfile] = useState({
     accessibilityRequired: false,
     prefersFewerTransfers: false,
@@ -30,99 +32,220 @@ function App() {
     preferredModes: [],
     avoidModes: [],
   });
-  const idxRef = useRef(0);
-  const pendingRef = useRef(DESTINATIONS[0]);
-  const timersRef = useRef([]);
 
-  const clearTimers = () => { timersRef.current.forEach((id) => { clearTimeout(id); clearInterval(id); }); timersRef.current = []; };
+  // Recording refs — not state because changes must not re-render mid-recording
+  const recorderRef    = useRef(null);
+  const streamRef      = useRef(null);
+  const chunksRef      = useRef([]);
+  const recordTimerRef = useRef(null);  // 15-second setTimeout id
+  const countdownRef   = useRef(null);  // 1-second setInterval id
+  // Guard: true while finishRecording is running so a stale timer doesn't fire twice
+  const finishingRef   = useRef(false);
 
-  // live voice "transcription" while listening
+  // Load GPS and destinations on mount
   useEffect(() => {
-    if (phase !== 'listening') return;
-    const d = pendingRef.current;
-    const words = d.phrase.split(' ');
-    let i = 0; setTranscript('');
-    const startDelay = setTimeout(() => {
-      const iv = setInterval(() => {
-        i++;
-        setTranscript(words.slice(0, i).join(' '));
-        if (i >= words.length) {
-          clearInterval(iv);
-          const done = setTimeout(() => {
-            setDest(d); setScreen('convo'); setPhase('idle');
-          }, 650 / spd);
-          timersRef.current.push(done);
-        }
-      }, 200 / spd);
-      timersRef.current.push(iv);
-    }, 700 / spd);
-    timersRef.current.push(startDelay);
-    return () => clearTimers();
-  }, [phase, spd]);
+    getUserLocation().then(setOriginCoord);
+    fetchDestinations().then((list) => {
+      setDestinations(list);
+      if (list.length > 0) setDest(list[0]);
+    });
+  }, []);
 
-  // arrival auto-closes back to the main page after 2s
+  // Deep-link support (runs once destinations are loaded)
+  useEffect(() => {
+    if (destinations.length === 0) return;
+    const qp = new URLSearchParams(location.search);
+    const qpDest = destinations.find((d) => d.id === qp.get('dest'));
+    const qpScreen = qp.get('screen');
+    const qpMode = qp.get('mode');
+    if (qpDest) setDest(qpDest);
+    if (['picker','convo','route','routes','onroute'].includes(qpScreen)) setScreen(qpScreen);
+    if (['car','bus','tube','walk'].includes(qpMode)) setMode(qpMode);
+  }, [destinations]);
+
+  // Arrival auto-closes after 2 s
   useEffect(() => {
     if (screen !== 'arrived') return;
     const id = setTimeout(() => { setScreen('home'); setPhase('idle'); setTranscript(''); }, 2000);
     return () => clearTimeout(id);
   }, [screen]);
 
-  const startListening = () => {
-    if (phase === 'listening') return;
-    const d = DESTINATIONS[idxRef.current % DESTINATIONS.length];
-    idxRef.current += 1;
-    pendingRef.current = d;
-    setPhase('listening');
-  };
-  // tapping the mic while listening turns it off and interrupts the speech
-  const toggleMic = () => {
-    if (phase === 'listening') { clearTimers(); setPhase('idle'); setTranscript(''); }
-    else startListening();
-  };
+  // ── Recording helpers ────────────────────────────────────────────────────
 
-  const pickSaved = (key) => { setAltIdx(0); setDest(SAVED[key]); setScreen('convo'); };
+  function stopStream() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  }
+
+  function clearCountdown() {
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+  }
+
+  function clearRecordTimer() {
+    if (recordTimerRef.current) { clearTimeout(recordTimerRef.current); recordTimerRef.current = null; }
+  }
+
+  // Called automatically after 15 s — never by a user tap
+  async function finishRecording() {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    clearRecordTimer();
+    clearCountdown();
+
+    const recorder = recorderRef.current;
+    if (!recorder) { finishingRef.current = false; return; }
+
+    // Collect final data and wait for recorder.onstop
+    const blob = await new Promise((resolve) => {
+      recorder.onstop = () => {
+        resolve(new Blob(chunksRef.current, { type: chunksRef.current[0]?.type || 'audio/webm' }));
+      };
+      if (recorder.state !== 'inactive') recorder.stop();
+      else resolve(new Blob(chunksRef.current, { type: 'audio/webm' }));
+    });
+
+    stopStream();
+    recorderRef.current = null;
+    chunksRef.current = [];
+
+    setPhase('processing');
+    setTranscript('Transcribing…');
+
+    const text = await transcribeSpeech(blob);
+    const matched = matchTranscriptToDest(text, destinations);
+
+    setTranscript(text || '');
+    setPhase('idle');
+    finishingRef.current = false;
+
+    if (matched) {
+      setDest(matched);
+      setApiResult(null);
+      setScreen('convo');
+    } else if (dest && text) {
+      // Follow-up question — destination already known, get a spoken AI response
+      const audioUrl = await askVoiceQuestion(text, dest.id);
+      if (audioUrl) new Audio(audioUrl).play();
+    } else {
+      // No destination matched and none previously set — open picker
+      setScreen('picker');
+    }
+  }
+
+  async function startRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Microphone access is not supported in this browser.');
+      return;
+    }
+
+    setPhase('requesting');
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setPhase('idle');
+      return; // User denied — stay silent
+    }
+
+    streamRef.current = stream;
+    chunksRef.current = [];
+    finishingRef.current = false;
+
+    // Pick the best supported MIME type
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/mp4';
+
+    const recorder = new MediaRecorder(stream, { mimeType });
+    recorderRef.current = recorder;
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    recorder.start(250); // collect chunks every 250 ms
+
+    setCountdown(15);
+    setPhase('recording');
+
+    // Countdown display
+    countdownRef.current = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) { clearInterval(countdownRef.current); countdownRef.current = null; return 0; }
+        return c - 1;
+      });
+    }, 1000);
+
+    // Auto-finish after 15 seconds
+    recordTimerRef.current = setTimeout(finishRecording, RECORD_MS);
+  }
+
+  function cancelRecording() {
+    clearRecordTimer();
+    clearCountdown();
+    finishingRef.current = false;
+
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+    recorderRef.current = null;
+    chunksRef.current = []; // discard audio — no STT call
+    stopStream();
+
+    setPhase('idle');
+    setTranscript('');
+    setCountdown(15);
+  }
+
+  function toggleMic() {
+    if (phase === 'idle') startRecording();
+    else if (phase === 'recording') cancelRecording();
+    // 'requesting' and 'processing': ignore taps
+  }
+
+  // ── Navigation helpers ───────────────────────────────────────────────────
+
   const openSearch = () => setScreen('picker');
-  const pickDest = (d) => { setAltIdx(0); setDest(d); setScreen('convo'); };
-  const pickMode = (m) => { setAltIdx(0); setMode(m); setScreen('route'); };
+  const pickDest  = (d) => { setApiResult(null); setDest(d); setScreen('convo'); };
+  const pickMode  = (m) => { setApiResult(null); setMode(m); setScreen('route'); };
+  const goHome    = () => { setScreen('home'); setPhase('idle'); setTranscript(''); };
 
-  const goHome = () => { clearTimers(); setScreen('home'); setPhase('idle'); setTranscript(''); };
+  const accentStyle = { '--spd': spd };
 
-  // accent theming
-  const accentStyle = {
-    '--spd': spd,
-  };
-
-  const route = getAlternatives(dest, mode)[altIdx] || getAlternatives(dest, mode)[0];
+  // ── Render ───────────────────────────────────────────────────────────────
 
   let content;
   if (screen === 'home') content = (
-    <HomeScreen phase={phase} transcript={transcript}
-      onMic={toggleMic} onSaved={pickSaved} onSearch={openSearch} />
+    <HomeScreen phase={phase} transcript={transcript} countdown={countdown}
+      onMic={toggleMic} onSearch={openSearch} />
   );
   else if (screen === 'picker') content = (
-    <PickerScreen onPick={pickDest} onBack={goHome} />
+    <PickerScreen destinations={destinations} onPick={pickDest} onBack={goHome} />
   );
-  else if (screen === 'convo') content = (
+  else if (screen === 'convo') content = dest ? (
     <ConvoScreen dest={dest} spd={spd} onPick={pickMode} onBack={goHome}
       userProfile={userProfile} onProfileChange={setUserProfile} />
-  );
-  else if (screen === 'route') content = (
-    <RouteScreen dest={dest} mode={mode} route={route} spd={spd}
-      onStart={() => setScreen('onroute')} onBack={() => setScreen('convo')}
-      onSetMode={(m) => { setAltIdx(0); setMode(m); }} onSeeMore={() => setScreen('routes')}
+  ) : null;
+  else if (screen === 'route') content = dest ? (
+    <RouteScreen dest={dest} mode={mode} spd={spd} originCoord={originCoord}
+      onStart={(result) => { setApiResult(result); setScreen('onroute'); }}
+      onBack={() => setScreen('convo')}
+      onSetMode={(m) => { setApiResult(null); setMode(m); }}
+      onSeeMore={() => setScreen('routes')}
+      onApiResult={setApiResult}
       userProfile={userProfile} />
-  );
-  else if (screen === 'routes') content = (
-    <RoutesScreen dest={dest} mode={mode} current={altIdx}
-      onPick={(i) => { setAltIdx(i); setScreen('route'); }} onBack={() => setScreen('route')} />
-  );
-  else if (screen === 'onroute') content = (
-    <OnRouteScreen dest={dest} mode={mode} route={route} spd={spd}
+  ) : null;
+  else if (screen === 'routes') content = dest ? (
+    <RoutesScreen dest={dest} mode={mode} apiResult={apiResult}
+      onPick={() => setScreen('route')} onBack={() => setScreen('route')} />
+  ) : null;
+  else if (screen === 'onroute') content = dest ? (
+    <OnRouteScreen dest={dest} mode={mode} activeRoute={apiResult && apiResult.recommendedRoute}
+      spd={spd} originCoord={originCoord}
       onArrive={() => setScreen('arrived')} onBack={() => setScreen('route')} />
-  );
-  else if (screen === 'arrived') content = (
+  ) : null;
+  else if (screen === 'arrived') content = dest ? (
     <ArrivalSheet dest={dest} />
-  );
+  ) : null;
 
   return (
     <div className="stage">
@@ -146,7 +269,6 @@ function App() {
   );
 }
 
-// Scales the fixed-size phone to fit the viewport.
 function DeviceFit({ children }) {
   const ref = useRef(null);
   const inner = useRef(null);
