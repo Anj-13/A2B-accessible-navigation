@@ -29,6 +29,12 @@ function HomeScreen({ phase, transcript, countdown, onMic, onSearch }) {
       <div className="a2b__body">
         <div className="shortcuts">
           <div className="tile shortcut" onClick={onSearch}>
+            <IconHome size={50} />
+          </div>
+          <div className="tile shortcut" onClick={onSearch}>
+            <IconWork size={50} />
+          </div>
+          <div className="tile shortcut" onClick={onSearch}>
             <IconSearch size={50} />
           </div>
         </div>
@@ -230,7 +236,8 @@ function RouteScreen({ dest, mode, spd, onStart, onBack, onSetMode, onSeeMore, o
   uE(() => {
     setApiResult(null);
     setApiLoading(true);
-    fetchRouteRecommendation(dest.id, mode, userProfile || {})
+    const transportGroup = mode === 'tube' ? 'tfl' : mode;
+    fetchAnalyzedRoute(originCoord, dest.id, transportGroup, userProfile || {})
       .then((r) => { setApiResult(r); setApiLoading(false); if (onApiResult) onApiResult(r); });
   }, [dest, mode]);
 
@@ -310,16 +317,14 @@ function RoutesScreen({ dest, mode, apiResult, onPick, onBack }) {
   const ModeI = MODE_ICON[mode];
   const modeName = MODES.find((m) => m.id === mode)?.label || mode;
 
-  // Build alternatives list from backend response
-  const alternatives = [];
-  if (apiResult) {
-    if (apiResult.recommendedRoute) {
-      alternatives.push({ ...apiResult.recommendedRoute, label: 'Recommended' });
-    }
-    (apiResult.alternativeRoutes || []).forEach((r) => {
-      alternatives.push(r);
-    });
-  }
+  // Build alternatives list — prefer allRoutes from /api/analyze-route
+  const recId = apiResult?.recommendedRoute?.id;
+  const alternatives = apiResult?.allRoutes?.length
+    ? apiResult.allRoutes.map((r) => ({ ...r, label: r.id === recId ? 'Recommended' : undefined }))
+    : [
+        ...(apiResult?.recommendedRoute ? [{ ...apiResult.recommendedRoute, label: 'Recommended' }] : []),
+        ...(apiResult?.alternativeRoutes || []),
+      ];
 
   return (
     <div className="a2b">
@@ -350,21 +355,136 @@ function RoutesScreen({ dest, mode, apiResult, onPick, onBack }) {
     </div>);
 }
 
-/* ---------- ON ROUTE (live) ---------- */
+/* ---------- REROUTE MODAL ---------- */
+function RerouteModal({ explanation, newRoute, onAccept, onDismiss }) {
+  const [countdown, setCountdown] = uS(15);
+  uE(() => {
+    const id = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) { clearInterval(id); onAccept(); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const eta     = newRoute ? (newRoute.etaMinutes ?? newRoute.eta_minutes ?? '—') : '—';
+  const summary = newRoute?.summary || 'Alternative route';
+
+  return (
+    <div className="modal-backdrop" onClick={onDismiss}>
+      <div className="modal enter" onClick={(e) => e.stopPropagation()}>
+        <div className="modal__title">Route Update</div>
+        <div style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 10 }}>{explanation}</div>
+        <div style={{ fontSize: 12, opacity: 0.65, marginBottom: 16 }}>
+          {summary} · {eta} min remaining
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="cta ghost" style={{ flex: 1 }} onClick={onDismiss}>Stay</button>
+          <button className="cta" style={{ flex: 1 }} onClick={onAccept}>
+            Reroute ({countdown}s)
+          </button>
+        </div>
+      </div>
+    </div>);
+}
+
+/* ---------- ON ROUTE (live) + Guide Agent ---------- */
+function haversineM(lat1, lng1, lat2, lng2) {
+  if (lat2 == null || lng2 == null) return Infinity;
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function OnRouteScreen({ dest, mode, activeRoute, spd, onArrive, onBack, originCoord }) {
   const ModeI = MODE_ICON[mode];
-  const eta = activeRoute ? (activeRoute.etaMinutes ?? activeRoute.eta_minutes ?? 0) : 0;
-  const line = activeRoute ? (activeRoute.summary || mode) : mode;
+  const transportGroup = mode === 'tube' ? 'tfl' : mode;
+  const useGuideAgent  = transportGroup === 'bus' || transportGroup === 'tfl';
+
+  // Local copy so rerouting can update it without re-mounting the screen
+  const [localRoute, setLocalRoute] = uS(activeRoute);
+  uE(() => { setLocalRoute(activeRoute); }, [activeRoute]);
+
+  const eta  = localRoute ? (localRoute.etaMinutes ?? localRoute.eta_minutes ?? 0) : 0;
+  const line = localRoute ? (localRoute.summary || mode) : mode;
 
   const [remaining, setRemaining] = uS(eta);
-  const lastMin = uR(eta);
+  const lastMin      = uR(eta);
   const arrivedGuard = uR(false);
+  const currentLegIdxRef = uR(0);
+  const pollingActive    = uR(false);
+
+  // Guide Agent state
+  const [pendingReroute, setPendingReroute] = uS(null); // { newRoute, explanation }
 
   uE(() => {
     setRemaining(eta);
     lastMin.current = eta;
     arrivedGuard.current = false;
+    currentLegIdxRef.current = 0;
   }, [dest, mode, activeRoute]);
+
+  // Update current leg index when GPS changes
+  uE(() => {
+    if (!originCoord || !localRoute?.legs) return;
+    const [lat, lng] = originCoord;
+    const legs = localRoute.legs;
+    for (let i = currentLegIdxRef.current; i < legs.length - 1; i++) {
+      const dist = haversineM(lat, lng, legs[i].to?.lat, legs[i].to?.lng);
+      if (dist < 30) {
+        currentLegIdxRef.current = i + 1; // mark leg as passed
+      } else {
+        break;
+      }
+    }
+  }, [originCoord]);
+
+  // Guide Agent — 20s polling loop (bus and tube modes only)
+  uE(() => {
+    if (!useGuideAgent || !localRoute?.legs) return;
+    const poll = async () => {
+      if (pollingActive.current || pendingReroute) return;
+      pollingActive.current = true;
+      try {
+        const legs = localRoute.legs;
+        const currentIdx = currentLegIdxRef.current;
+        const result = await fetchAnalyzedRoute(
+          originCoord, dest.id, transportGroup, {},
+          {
+            currentRouteId:  localRoute.id,
+            currentLegId:    legs[currentIdx]?.leg_id,
+            activeRouteLegs: legs,
+          }
+        );
+        if (result?.shouldReroute && result.recommendedRoute?.id !== localRoute.id) {
+          setPendingReroute({
+            newRoute:    result.recommendedRoute,
+            explanation: result.explanation || 'A faster route is now available.',
+          });
+        }
+      } finally {
+        pollingActive.current = false;
+      }
+    };
+
+    const id = setInterval(poll, 20000);
+    return () => clearInterval(id);
+  }, [localRoute, transportGroup, dest, useGuideAgent]);
+
+  function acceptReroute() {
+    if (!pendingReroute) return;
+    const nr = pendingReroute.newRoute;
+    setLocalRoute(nr);
+    const newEta = nr.etaMinutes ?? nr.eta_minutes ?? remaining;
+    setRemaining(newEta);
+    lastMin.current = newEta;
+    currentLegIdxRef.current = 0;
+    setPendingReroute(null);
+  }
 
   const handleProgress = (frac) => {
     const rem = Math.max(0, Math.ceil(eta * (1 - frac)));
@@ -406,6 +526,15 @@ function OnRouteScreen({ dest, mode, activeRoute, spd, onArrive, onBack, originC
           </div>
           <button className="cta ghost" onClick={onArrive}>End &amp; I've arrived</button>
         </div>
+
+        {pendingReroute && (
+          <RerouteModal
+            explanation={pendingReroute.explanation}
+            newRoute={pendingReroute.newRoute}
+            onAccept={acceptReroute}
+            onDismiss={() => setPendingReroute(null)}
+          />
+        )}
       </div>
     </div>);
 }
@@ -426,5 +555,6 @@ function ArrivalSheet({ dest }) {
 }
 
 Object.assign(window, {
-  Header, HomeScreen, PickerScreen, ConvoScreen, RouteScreen, RoutesScreen, OnRouteScreen, ArrivalSheet
+  Header, HomeScreen, PickerScreen, ConvoScreen, RouteScreen, RoutesScreen,
+  OnRouteScreen, ArrivalSheet, RerouteModal,
 });

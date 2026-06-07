@@ -42,13 +42,29 @@ function App() {
   // Guard: true while finishRecording is running so a stale timer doesn't fire twice
   const finishingRef   = useRef(false);
 
-  // Load GPS and destinations on mount
+  // Load GPS and destinations on mount; keep GPS live for on-route guidance
   useEffect(() => {
     getUserLocation().then(setOriginCoord);
     fetchDestinations().then((list) => {
       setDestinations(list);
       if (list.length > 0) setDest(list[0]);
     });
+
+    let watchId = null;
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude: lat, longitude: lng } = pos.coords;
+          const inLondon =
+            lat >= LONDON_BOUNDS.latMin && lat <= LONDON_BOUNDS.latMax &&
+            lng >= LONDON_BOUNDS.lngMin && lng <= LONDON_BOUNDS.lngMax;
+          if (inLondon) setOriginCoord([lat, lng]);
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+      );
+    }
+    return () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId); };
   }, []);
 
   // Deep-link support (runs once destinations are loaded)

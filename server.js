@@ -6,8 +6,33 @@ const path = require("node:path");
 const { URL } = require("node:url");
 
 const { demoScenarios } = require("./demoScenarios");
-const { buildRecommendationInput } = require("./dataIntegration");
+const { buildRecommendationInput, adaptDataRoute, loadSupportingFiles } = require("./dataIntegration");
 const { recommendRoute } = require("./scoreRoute");
+const { fetchJourneys, fetchDisruptions } = require("./tflClient");
+
+const VLLM_BASE_URL = process.env.VLLM_BASE_URL || "http://localhost:8000";
+const VLLM_MODEL = process.env.VLLM_MODEL || "unsloth/NVIDIA-Nemotron-3-Nano-Omni-30B-A3B-Reasoning-GGUF";
+const VLLM_TIMEOUT_MS = Number(process.env.VLLM_TIMEOUT_SECONDS || 30) * 1000;
+
+function callVLLM(messages) {
+  return new Promise((resolve, reject) => {
+    const url = new URL("/v1/chat/completions", VLLM_BASE_URL);
+    const payload = JSON.stringify({ model: VLLM_MODEL, messages, max_tokens: 300, temperature: 0.1 });
+    const req = http.request(
+      { hostname: url.hostname, port: url.port || 80, path: url.pathname, method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload), "Authorization": "Bearer VLLM_API_KEY" } },
+      (res) => {
+        let data = "";
+        res.on("data", (c) => { data += c; });
+        res.on("end", () => { try { resolve(JSON.parse(data)); } catch { reject(new Error("vLLM: invalid JSON response")); } });
+      }
+    );
+    req.setTimeout(VLLM_TIMEOUT_MS, () => { req.destroy(); reject(new Error("vLLM: request timed out")); });
+    req.on("error", reject);
+    req.write(payload);
+    req.end();
+  });
+}
 
 const DEST_ROUTE_FILES = {
   baker:  "route_data_baker.json",
@@ -141,6 +166,105 @@ async function requestHandler(request, response) {
       sendJson(response, 200, result);
     } catch (error) {
       sendJson(response, error.statusCode ?? 400, {
+        error: error.message,
+        details: error.details ?? [],
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/analyze-route") {
+    try {
+      const body = await readJsonBody(request);
+      const fromCoord    = body.fromCoord;
+      const destId       = body.destinationId ?? body.destination_id ?? null;
+      const transportGroup = body.transportGroup ?? "tfl";
+      const userProfile  = body.userProfile ?? {};
+      const currentRouteId = body.currentRouteId;
+      const currentLegId   = body.currentLegId;
+
+      const destinations = JSON.parse(fs.readFileSync(path.join(__dirname, "destinations.json"), "utf8"));
+      const dest = destinations.find((d) => d.id === destId);
+      if (!dest) {
+        sendJson(response, 400, { error: `Unknown destinationId: ${destId}` });
+        return;
+      }
+      const toCoord = dest.coord;
+
+      // Car and Walk: use existing static route data (no TfL call)
+      if (transportGroup === "car" || transportGroup === "walk" || !fromCoord) {
+        const modeFilter = transportGroup === "car" ? "car" : transportGroup === "walk" ? "walk" : undefined;
+        const input = buildRecommendationInput({
+          userProfile,
+          currentRouteId,
+          journeyTime: body.journeyTime,
+          rerouteThreshold: body.rerouteThreshold,
+          routeData: loadDestRouteFile(destId),
+          modeFilter,
+        });
+        const result = recommendRoute(input);
+        result.allRoutes = [result.recommendedRoute, ...(result.alternativeRoutes || [])].filter(Boolean);
+        sendJson(response, 200, result);
+        return;
+      }
+
+      // Check next-leg disruptions for Guide Agent polling requests
+      let nextLegDisruptions = [];
+      if (currentLegId && Array.isArray(body.activeRouteLegs)) {
+        const legs = body.activeRouteLegs;
+        const currentIdx = legs.findIndex((l) => l.leg_id === currentLegId);
+        const nextLeg = currentIdx >= 0 ? legs[currentIdx + 1] : null;
+        if (nextLeg?.line_id) {
+          nextLegDisruptions = await fetchDisruptions(nextLeg.line_id);
+        }
+      }
+
+      // Fetch live routes from TfL Journey Planner
+      const tflModes = transportGroup === "bus"
+        ? ["bus"]
+        : ["tube", "bus", "dlr", "overground"];
+
+      const routes = await fetchJourneys(fromCoord, toCoord, tflModes, {
+        accessibilityRequired: Boolean(userProfile.accessibilityRequired),
+      });
+
+      if (routes.length === 0) {
+        sendJson(response, 404, { error: "No routes found from TfL API." });
+        return;
+      }
+
+      // Overlay static accessibility + traffic event data where available
+      const { accessibilityData, trafficData } = loadSupportingFiles();
+      const adaptedRoutes = routes.map((r) => adaptDataRoute(r, accessibilityData, trafficData));
+
+      // Analyzer stub — replaced by Nemoclaw/DGX Spark when available
+      const selectedId = currentRouteId ?? adaptedRoutes[0].id;
+      const currentRoute = adaptedRoutes.find((r) => r.id === selectedId) ?? adaptedRoutes[0];
+      const alternatives = adaptedRoutes.filter((r) => r.id !== currentRoute.id);
+
+      const result = recommendRoute({
+        userProfile,
+        currentRoute,
+        alternativeRoutes: alternatives,
+        journeyTime: body.journeyTime,
+        rerouteThreshold: body.rerouteThreshold,
+      });
+
+      // Force reroute flag if TfL reports active disruption on next leg
+      if (nextLegDisruptions.length > 0 && !result.shouldReroute && alternatives.length > 0) {
+        result.shouldReroute = true;
+        result.rerouteTrigger = "disruption";
+        const desc = nextLegDisruptions[0].description
+          || nextLegDisruptions[0].categoryDescription
+          || "service disruption";
+        result.explanation = `Disruption on your next leg: ${desc}. Switching to a faster alternative.`;
+      }
+
+      result.allRoutes = adaptedRoutes;
+      result.nextLegDisruptions = nextLegDisruptions;
+      sendJson(response, 200, result);
+    } catch (error) {
+      sendJson(response, error.statusCode ?? 500, {
         error: error.message,
         details: error.details ?? [],
       });

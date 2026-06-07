@@ -126,8 +126,35 @@ async function askVoiceQuestion(transcript, destId) {
   }
 }
 
+// POST to /api/analyze-route — used by both RouteScreen (initial) and Guide Agent (reroute poll).
+// options may include { currentRouteId, currentLegId, activeRouteLegs } for reroute checks.
+async function fetchAnalyzedRoute(fromCoord, destId, transportGroup, userProfile = {}, options = {}) {
+  try {
+    const res = await fetch(`${API_BASE}/api/analyze-route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fromCoord,
+        destinationId: destId,
+        transportGroup,
+        userProfile,
+        journeyTime: new Date().toISOString(),
+        rerouteThreshold: 8,
+        ...options,
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    data._requestedMode = transportGroup === 'tfl' ? 'tube' : transportGroup;
+    return data;
+  } catch (err) {
+    console.warn('[A2B] Analyze route failed:', err.message);
+    return null;
+  }
+}
+
 Object.assign(window, {
-  MODES, MODE_TINT, FALLBACK_COORD, API_BASE, VOICE_BASE,
+  MODES, MODE_TINT, FALLBACK_COORD, LONDON_BOUNDS, API_BASE, VOICE_BASE,
   getUserLocation, fetchDestinations, transcribeSpeech, matchTranscriptToDest,
-  fetchRouteRecommendation, askVoiceQuestion,
+  fetchRouteRecommendation, askVoiceQuestion, fetchAnalyzedRoute,
 });
