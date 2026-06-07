@@ -1,4 +1,5 @@
 "use strict";
+try { require("fs").readFileSync(".env","utf8").split("\n").forEach(l=>{ const [k,...v]=l.split("="); if(k&&k.trim()&&v.length) process.env[k.trim()]=v.join("=").trim(); }); } catch {}
 
 const fs = require("node:fs");
 const http = require("node:http");
@@ -237,18 +238,87 @@ async function requestHandler(request, response) {
       const { accessibilityData, trafficData } = loadSupportingFiles();
       const adaptedRoutes = routes.map((r) => adaptDataRoute(r, accessibilityData, trafficData));
 
-      // Analyzer stub — replaced by Nemoclaw/DGX Spark when available
+      // Analyzer: call GPT-OSS 120B via Ollama on DGX Spark; fall back to scoreRoute if unreachable
       const selectedId = currentRouteId ?? adaptedRoutes[0].id;
       const currentRoute = adaptedRoutes.find((r) => r.id === selectedId) ?? adaptedRoutes[0];
       const alternatives = adaptedRoutes.filter((r) => r.id !== currentRoute.id);
 
-      const result = recommendRoute({
-        userProfile,
-        currentRoute,
-        alternativeRoutes: alternatives,
-        journeyTime: body.journeyTime,
-        rerouteThreshold: body.rerouteThreshold,
-      });
+      let result;
+      if (VLLM_BASE_URL && VLLM_BASE_URL !== "http://localhost:8000") {
+        try {
+          const routePayload = {
+            task: "route_selection",
+            user_constraints: {
+              accessibilityRequired: Boolean(userProfile.accessibilityRequired),
+              prefersFewerTransfers: Boolean(userProfile.prefersFewerTransfers),
+              costSensitive: Boolean(userProfile.costSensitive),
+              preferredModes: userProfile.preferredModes || [],
+              avoidModes: userProfile.avoidModes || [],
+            },
+            candidate_routes: adaptedRoutes.map((r) => ({
+              id: r.id,
+              summary: r.summary || r.id,
+              mode: r.mode,
+              eta_minutes: r.etaMinutes ?? r.eta_minutes,
+              walking_minutes: r.walkingMinutes ?? r.walking_minutes,
+              transfers: r.transfers,
+              step_free: r.stepFree ?? r.step_free,
+              lift_status: r.liftStatus ?? r.lift_status ?? "unknown",
+              disruption_minutes: r.disruptionMinutes ?? r.disruption_minutes ?? 0,
+              crowding_level: r.crowdingLevel ?? r.crowding_level ?? "unknown",
+              base_fare: r.baseFare ?? r.base_fare ?? 0,
+            })),
+            current_route_id: currentRoute.id,
+            current_leg_id: currentLegId ?? null,
+          };
+
+          const messages = [
+            {
+              role: "system",
+              content:
+                "You are an accessibility-first route selection engine for London transit. " +
+                "Given a JSON payload with candidate_routes and user_constraints, " +
+                "respond ONLY with valid JSON matching exactly: " +
+                '{"recommended_route_id":"...","explanation":"...","should_reroute":false,"scores":{}}',
+            },
+            { role: "user", content: JSON.stringify(routePayload) },
+          ];
+
+          const vllmResp = await callVLLM(messages);
+          const content = vllmResp?.choices?.[0]?.message?.content ?? "";
+          const parsed = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
+
+          const recommended =
+            adaptedRoutes.find((r) => r.id === parsed.recommended_route_id) ?? currentRoute;
+          const alts = adaptedRoutes.filter((r) => r.id !== recommended.id);
+
+          result = {
+            recommendedRoute: recommended,
+            alternativeRoutes: alts,
+            shouldReroute: Boolean(parsed.should_reroute),
+            rerouteTrigger: parsed.reroute_trigger ?? null,
+            explanation: parsed.explanation ?? "GPT-OSS 120B selected this route.",
+            confidence: 0.9,
+            scores: parsed.scores ?? {},
+          };
+        } catch {
+          result = recommendRoute({
+            userProfile,
+            currentRoute,
+            alternativeRoutes: alternatives,
+            journeyTime: body.journeyTime,
+            rerouteThreshold: body.rerouteThreshold,
+          });
+        }
+      } else {
+        result = recommendRoute({
+          userProfile,
+          currentRoute,
+          alternativeRoutes: alternatives,
+          journeyTime: body.journeyTime,
+          rerouteThreshold: body.rerouteThreshold,
+        });
+      }
 
       // Force reroute flag if TfL reports active disruption on next leg
       if (nextLegDisruptions.length > 0 && !result.shouldReroute && alternatives.length > 0) {
