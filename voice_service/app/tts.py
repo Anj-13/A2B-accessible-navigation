@@ -6,10 +6,15 @@ functions will raise an explanatory error when called.
 """
 from pathlib import Path
 from typing import Optional
-from .config import ELEVENLABS_API_KEY, VOICE_NAME, VOICE_ID
+from .config import ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, VOICE_NAME
 
 
-def synthesize(text: str, output_path: Optional[str] = None, voice_name: Optional[str] = None) -> str:
+def synthesize(
+    text: str,
+    output_path: Optional[str] = None,
+    voice_name: Optional[str] = None,
+    voice_id: Optional[str] = None,
+) -> str:
     """Synthesize `text` to an MP3 file using ElevenLabs.
 
     Returns the path to the saved audio file.
@@ -30,12 +35,13 @@ def synthesize(text: str, output_path: Optional[str] = None, voice_name: Optiona
 
     client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 
-    voice_to_use = voice_name or VOICE_NAME
-    voice_id = VOICE_ID or _resolve_voice_id(client, voice_to_use)
+    selected_voice_id = voice_id or ELEVENLABS_VOICE_ID
+    if not selected_voice_id:
+        selected_voice_id = _resolve_voice_id(client, voice_name or VOICE_NAME)
 
     # `convert` returns an iterator of audio bytes that the SDK `save` helper can write
     audio = client.text_to_speech.convert(
-        voice_id=voice_id,
+        voice_id=selected_voice_id,
         text=text,
         model_id="eleven_multilingual_v2",
         output_format="mp3_44100_128",

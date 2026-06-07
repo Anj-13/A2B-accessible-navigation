@@ -20,8 +20,10 @@ const FALLBACK_COORD = [51.5101, -0.1340];
 // London bounding box for GPS validation
 const LONDON_BOUNDS = { latMin: 51.28, latMax: 51.72, lngMin: -0.55, lngMax: 0.30 };
 
-// API base URL — change to your machine IP when testing across devices
-const API_BASE = 'http://localhost:3000';
+// Use the server that delivered the app so custom ports and LAN hosts work.
+const API_BASE = location.protocol === 'http:' || location.protocol === 'https:'
+  ? location.origin
+  : 'http://localhost:3000';
 
 // Voice service base URL (Python FastAPI, port 5001)
 const VOICE_BASE = 'http://localhost:5001';

@@ -98,8 +98,18 @@ def generate_response(
             return FALLBACK_RESPONSE
         return message
     except requests.exceptions.RequestException as exc:
-        logger.error("Failed to connect to Ollama at %s with model %s: %s", url, OLLAMA_MODEL, exc, exc_info=True)
+        logger.warning(
+            "Ollama unavailable at %s with model %s: %s",
+            url,
+            OLLAMA_MODEL,
+            exc,
+        )
     except ValueError as exc:
-        logger.error("Ollama returned invalid JSON from %s with model %s: %s", url, OLLAMA_MODEL, exc, exc_info=True)
+        logger.warning(
+            "Ollama returned invalid JSON from %s with model %s: %s",
+            url,
+            OLLAMA_MODEL,
+            exc,
+        )
 
     return FALLBACK_RESPONSE

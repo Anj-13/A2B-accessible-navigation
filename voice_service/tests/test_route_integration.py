@@ -17,6 +17,7 @@ class RouteIntegrationTests(TestCase):
         )
 
         self.assertTrue(profile["accessibilityRequired"])
+        self.assertIn("cycle", profile["avoidModes"])
 
     def test_route_api_result_is_added_to_ollama_prompt(self):
         recommendation = {

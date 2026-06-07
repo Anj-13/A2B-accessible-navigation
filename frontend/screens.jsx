@@ -234,12 +234,17 @@ function RouteScreen({ dest, mode, spd, onStart, onBack, onSetMode, onSeeMore, o
   }, [dest, mode, spd]);
 
   uE(() => {
+    let cancelled = false;
     setApiResult(null);
     setApiLoading(true);
-    const transportGroup = mode === 'tube' ? 'tfl' : mode;
-    fetchAnalyzedRoute(originCoord, dest.id, transportGroup, userProfile || {})
-      .then((r) => { setApiResult(r); setApiLoading(false); if (onApiResult) onApiResult(r); });
-  }, [dest, mode]);
+    fetchRouteRecommendation(dest, mode, userProfile || {})
+      .then((r) => {
+        if (cancelled) return;
+        setApiResult(r);
+        setApiLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [dest, mode, userProfile]);
 
   const rec = apiResult && apiResult.recommendedRoute;
   const eta  = rec ? (rec.etaMinutes ?? rec.eta_minutes ?? '—') : '…';
@@ -555,6 +560,5 @@ function ArrivalSheet({ dest }) {
 }
 
 Object.assign(window, {
-  Header, HomeScreen, PickerScreen, ConvoScreen, RouteScreen, RoutesScreen,
-  OnRouteScreen, ArrivalSheet, RerouteModal,
+  Header, HomeScreen, PickerScreen, ConvoScreen, RouteScreen, RoutesScreen, OnRouteScreen, ArrivalSheet
 });
