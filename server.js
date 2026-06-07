@@ -257,30 +257,37 @@ async function requestHandler(request, response) {
 }
 
 function createServer() {
+  const certPath = path.join(__dirname, "cert.pem");
+  const keyPath  = path.join(__dirname, "key.pem");
+  if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+    const https = require("node:https");
+    return https.createServer(
+      { cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) },
+      requestHandler
+    );
+  }
   return http.createServer(requestHandler);
 }
 
 if (require.main === module) {
   const server = createServer();
+  const usingHttps = fs.existsSync(path.join(__dirname, "cert.pem"));
 
   server.on("error", (error) => {
     if (error.code === "EADDRINUSE") {
-      console.error(
-        `Port ${PORT} is already in use. Try: PORT=3001 npm start`,
-      );
+      console.error(`Port ${PORT} is already in use. Try: PORT=3001 npm start`);
     } else if (error.code === "EPERM") {
-      console.error(
-        `Permission denied while starting on ${HOST}:${PORT}. Try another port with: PORT=3001 npm start`,
-      );
+      console.error(`Permission denied on ${HOST}:${PORT}. Try: PORT=3001 npm start`);
     } else {
-      console.error("Failed to start route recommendation API:", error);
+      console.error("Failed to start:", error);
     }
-
     process.exitCode = 1;
   });
 
   server.listen(PORT, HOST, () => {
-    console.log(`Route recommendation API listening on http://${HOST}:${PORT}`);
+    const proto = usingHttps ? "https" : "http";
+    console.log(`A2B listening on ${proto}://${HOST}:${PORT}`);
+    if (usingHttps) console.log("HTTPS enabled — microphone will work on mobile.");
   });
 }
 
