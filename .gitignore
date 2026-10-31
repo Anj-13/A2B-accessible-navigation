@@ -1,0 +1,32 @@
+# Secrets and environment files
+.env
+.env.*
+*.env
+!.env.example
+.envrc
+
+# TLS certificates and private keys (server.js uses cert.pem and key.pem for HTTPS)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.ppk
+id_rsa
+id_ed25519
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# Generated voice audio
+*.mp3
+*.wav
+
+# Logs
+*.log
